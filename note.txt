@@ -1,0 +1,55 @@
+users
+id
+name
+email
+password
+role (admin, manajemen, personil)
+jabatan
+created_at
+updated_at
+
+lembur
+id
+user_id (relasi ke tabel users)
+tanggal_lembur
+jam_masuk
+jam_keluar
+total_jam (pengurangan jam_keluar dengan jam_masuk)
+uraian_pekerjaan
+status (pending, approved, rejected)
+notes (catatan dari manajemen)
+created_at
+updated_at
+
+cuti
+id
+user_id (relasi ke tabel users)
+jenis_cuti (tahunan, khusus)
+mulai_cuti
+selesai_cuti
+lama_cuti (pengurangan dari selesai_cuti dengan mulai_cuti)
+alasan
+status (pending, approved, rejected)
+notes (catatan dari manajemen)
+created_at
+updated_at
+
+cuti_quota
+id
+user_id (relasi ke tabel users)
+jenis_cuti (tahunan, khusus)
+durasi_cuti (jumlah hari cuti yang tersedia)
+created_at
+updated_at
+
+perjalanan_dinas
+id
+user_id (relasi ke tabel users)
+tanggal_berangkat
+tanggal_pulang
+jurusan (tujuan perjalanan dinas)
+lama_dinas (pengurangan tanggal_pulang dengan tanggal_berangkat)
+created_at
+updated_at
+
+

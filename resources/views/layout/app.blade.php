@@ -11,7 +11,14 @@
   <link rel="stylesheet" href="{{asset('assets/compiled/css/iconly.css')}}">
 </head>
 <body>
+  <div id="app">
     @include('sweetalert::alert')
+
+    <header class="my-3 mx-4">
+      <a href="#" class="burger-btn d-block d-xl-none">
+          <i class="bi bi-justify fs-3"></i>
+      </a>
+    </header>
 
 
     @include('inc.sidebar')
@@ -27,6 +34,8 @@
     <script src="{{ asset('assets/extensions/perfect-scrollbar/perfect-scrollbar.min.js') }}"></script>
     <script src="{{ asset('assets/extensions/sweetalert2/sweetalert2.min.js') }}"></script>
     <script src="{{ asset('assets/compiled/js/app.js') }}"></script>
+
+  </div>
     
 </body>
 </html>

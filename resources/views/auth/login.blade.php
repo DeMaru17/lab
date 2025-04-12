@@ -45,9 +45,7 @@
                 
                 <button type="submit" class="btn btn-primary btn-block btn-lg shadow-lg mt-5">Masuk</button>
             </form>
-            <div class="text-center mt-5 text-lg fs-4">
-                <p> <a href="{{route('register')}}" class="font-bold">Daftar</a></p>
-            </div>
+            
         </div>
     </div>
     <div class="col-lg-7 d-none d-lg-block">

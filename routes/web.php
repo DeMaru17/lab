@@ -16,3 +16,6 @@ Route::post('register', [\App\Http\Controllers\RegisterController::class, 'store
 
 // index route
 Route::get('index', [\App\Http\Controllers\DashboardController::class, 'index']);
+
+
+Route::resource('personil', \App\Http\Controllers\UserController::class);
