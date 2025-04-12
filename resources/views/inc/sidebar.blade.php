@@ -77,8 +77,8 @@
     </li>
 
     <li
-        class="sidebar-item {{ Route::is('#') ? 'active' : '' }}">
-        <a href="#" class='sidebar-link'>
+        class="sidebar-item {{ Route::is('') ? 'active' : '' }}">
+        <a href="{{route('perjalanan-dinas.index')}}" class='sidebar-link'>
             <i class="bi bi-airplane-fill"></i>
             <span>Perjalanan Dinas</span>
         </a>
