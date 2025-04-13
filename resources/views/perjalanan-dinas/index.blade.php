@@ -13,7 +13,7 @@
                 <div class="col-12 col-md-6 order-md-2 order-first">
                     <nav aria-label="breadcrumb" class="breadcrumb-header float-start float-lg-end">
                         <ol class="breadcrumb">
-                            <li class="breadcrumb-item"><a href="#">Dashboard</a></li>
+                            <li class="breadcrumb-item"><a href="{{route('dashboard.index')}}">Dashboard</a></li>
                             <li class="breadcrumb-item active" aria-current="page">Perjalanan Dinas</li>
                         </ol>
                     </nav>
@@ -50,9 +50,9 @@
                                         <td>{{ $loop->iteration }}</td>
                                         <td>{{ $dinas->user->name }}</td>
                                         <td>{{ $dinas->jurusan }}</td>
-                                        <td>{{ $dinas->tanggal_berangkat }}</td>
-                                        <td>{{ $dinas->perkiraan_tanggal_pulang }}</td>
-                                        <td>{{ $dinas->tanggal_pulang ?? '-' }}</td>
+                                        <td>{{ \Carbon\Carbon::parse($dinas->tanggal_berangkat)->format('d-m-Y') }}</td>
+                                        <td>{{ \Carbon\Carbon::parse($dinas->perkiraan_tanggal_pulang)->format('d-m-Y') }}</td>
+                                        <td>{{ $dinas->tanggal_pulang ? \Carbon\Carbon::parse($dinas->tanggal_pulang)->format('d-m-Y') : '-' }}</td>
                                         <td>{{ $dinas->lama_dinas ?? '-' }} hari</td>
                                         <td>
                                             <span class="badge bg-{{ $dinas->status == 'selesai' ? 'success' : 'warning' }}">

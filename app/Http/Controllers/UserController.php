@@ -34,14 +34,14 @@ class UserController extends Controller
                 'email' => 'required|email|unique:users,email',
                 'password' => 'required|min:8|confirmed',
                 'password_confirmation' => 'required|same:password',
-                'jabatan' => 'required|in:manager,asisten manager,preparator,analis,mekanik,admin',
+                'jabatan' => 'required|in:manager,asisten manager analis,asisten manager preparator ,preparator,analis,mekanik,admin',
             ], [
                 'password.confirmed' => 'Password dan konfirmasi password tidak cocok.',
                 'password_confirmation.same' => 'Konfirmasi password tidak sesuai.',
             ]);
 
             $role = match ($request->jabatan) {
-                'manager', 'asisten manager' => 'manajemen',
+                'manager', 'asisten manager analis', 'asisten manager preparator' => 'manajemen',
                 'admin' => 'admin',
                 default => 'personil',
             };
@@ -82,7 +82,7 @@ class UserController extends Controller
             $request->validate([
                 'name' => 'required|string|max:255',
                 'email' => 'required|email|unique:users,email,' . $personil->id,
-                'jabatan' => 'required|in:manager,asisten manager,preparator,analis,mekanik,admin',
+                'jabatan' => 'required|in:manager,asisten manager analis,asisten manager preparator,preparator,analis,mekanik,admin',
                 'password' => 'nullable|min:8|confirmed', // Validasi untuk password opsional
                 'password_confirmation' => 'nullable|same:password', // Validasi konfirmasi password
             ], [
@@ -91,7 +91,7 @@ class UserController extends Controller
             ]);
 
             $role = match ($request->jabatan) {
-                'manager', 'asisten manager' => 'manajemen',
+                'manager', 'asisten manager analis', 'asisten manager preparator' => 'manajemen',
                 'admin' => 'admin',
                 default => 'personil',
             };

@@ -51,7 +51,8 @@
                             <select id="jabatan" name="jabatan" class="form-select" required>
                                 <option value="" disabled selected>Pilih jabatan</option>
                                 <option value="manager">Manager</option>
-                                <option value="asisten manager">Asisten Manager</option>
+                                <option value="asisten manager analis">Asisten Manager Analis</option>
+                                <option value="asisten manager preparator">Asisten Manager Preparator</option>
                                 <option value="preparator">Preparator</option>
                                 <option value="analis">Analis</option>
                                 <option value="mekanik">Mekanik</option>

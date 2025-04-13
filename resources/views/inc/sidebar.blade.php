@@ -43,8 +43,8 @@
     <li class="sidebar-title">Menu</li>
     
     <li
-        class="sidebar-item {{ Route::is('#') ? 'active' : '' }} ">
-        <a href="index.html" class='sidebar-link'>
+        class="sidebar-item {{ Route::is('dashboard.*') ? 'active' : '' }} ">
+        <a href="{{route('dashboard.index')}}" class='sidebar-link'>
             <i class="bi bi-grid-fill"></i>
             <span>Dashboard</span>
         </a>
@@ -77,7 +77,7 @@
     </li>
 
     <li
-        class="sidebar-item {{ Route::is('') ? 'active' : '' }}">
+        class="sidebar-item {{ Route::is('perjalanan-dinas.*') ? 'active' : '' }}">
         <a href="{{route('perjalanan-dinas.index')}}" class='sidebar-link'>
             <i class="bi bi-airplane-fill"></i>
             <span>Perjalanan Dinas</span>
@@ -90,10 +90,24 @@
             <span>Personil</span>
         </a>
     </li>
+
+
     
     
     
 </ul>
+
+    <ul class="menu">
+        <li class="sidebar-item" style="margin-top: 15px;">
+            <a href="{{ route('logout') }}" class='sidebar-link' onclick="event.preventDefault(); if (confirm('Apakah Anda yakin ingin keluar?')) { document.getElementById('logout-form').submit(); }">
+                <i class="bi bi-door-open-fill"></i>
+                <span>Logout</span>
+            </a>
+            <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+                @csrf
+            </form>
+        </li>
+    </ul>
 </div>
 </div>
 </div>

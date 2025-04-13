@@ -43,7 +43,8 @@
                             <label for="jabatan">Jabatan</label>
                             <select id="jabatan" name="jabatan" class="form-select" required>
                                 <option value="manager" {{ $user->jabatan == 'manager' ? 'selected' : '' }}>Manager</option>
-                                <option value="asisten manager" {{ $user->jabatan == 'asisten manager' ? 'selected' : '' }}>Asisten Manager</option>
+                                <option value="asisten manager analis" {{ $user->jabatan == 'asisten manager analis' ? 'selected' : '' }}>Asisten Manager Analis</option>
+                                <option value="asisten manager preparator" {{ $user->jabatan == 'asisten manager preparator' ? 'selected' : '' }}>Asisten Manager Preparator</option>
                                 <option value="preparator" {{ $user->jabatan == 'preparator' ? 'selected' : '' }}>Preparator</option>
                                 <option value="analis" {{ $user->jabatan == 'analis' ? 'selected' : '' }}>Analis</option>
                                 <option value="mekanik" {{ $user->jabatan == 'mekanik' ? 'selected' : '' }}>Mekanik</option>

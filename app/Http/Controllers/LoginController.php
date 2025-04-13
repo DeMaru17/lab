@@ -23,7 +23,7 @@ class LoginController extends Controller
         $credential = $request->only(['email', 'password']);
         if (Auth::attempt($credential)) {
             toast('Berhasil Masuk', 'success');
-            return redirect()->intended('index');
+            return redirect()->intended('dashboard');
         }
         Alert::error('Gagal Masuk', 'Periksa kembali isian Anda');
         return redirect()->back()->withErrors(['Login gagal. Mohon periksa kembali email dan password anda!']);
@@ -32,6 +32,6 @@ class LoginController extends Controller
     public  function logout(Request $request)
     {
         Auth::logout();
-        return redirect()->route('dashboard');
+        return redirect()->route('login')->with('success', 'Anda telah berhasil keluar.');
     }
 }
