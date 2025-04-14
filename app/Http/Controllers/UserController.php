@@ -32,6 +32,7 @@ class UserController extends Controller
             $request->validate([
                 'name' => 'required|string|max:255',
                 'email' => 'required|email|unique:users,email',
+                'jenis_kelamin' => 'required|in:Laki-laki,Perempuan',
                 'password' => 'required|min:8|confirmed',
                 'password_confirmation' => 'required|same:password',
                 'jabatan' => 'required|in:manager,asisten manager analis,asisten manager preparator ,preparator,analis,mekanik,admin',
@@ -49,6 +50,7 @@ class UserController extends Controller
             User::create([
                 'name' => $request->name,
                 'email' => $request->email,
+                'jenis_kelamin' => $request->jenis_kelamin,
                 'password' => Hash::make($request->password),
                 'jabatan' => $request->jabatan,
                 'role' => $role,
@@ -82,6 +84,7 @@ class UserController extends Controller
             $request->validate([
                 'name' => 'required|string|max:255',
                 'email' => 'required|email|unique:users,email,' . $personil->id,
+                'jenis_kelamin' => 'required|in:Laki-laki,Perempuan',
                 'jabatan' => 'required|in:manager,asisten manager analis,asisten manager preparator,preparator,analis,mekanik,admin',
                 'password' => 'nullable|min:8|confirmed', // Validasi untuk password opsional
                 'password_confirmation' => 'nullable|same:password', // Validasi konfirmasi password
@@ -100,6 +103,7 @@ class UserController extends Controller
             $personil->update([
                 'name' => $request->name,
                 'email' => $request->email,
+                'jenis_kelamin' => $request->jenis_kelamin,
                 'jabatan' => $request->jabatan,
                 'role' => $role,
                 // Update password jika diisi

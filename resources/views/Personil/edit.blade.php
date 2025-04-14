@@ -40,6 +40,14 @@
                             <input type="email" id="email" name="email" class="form-control" value="{{ $user->email }}" placeholder="Masukkan email" required>
                         </div>
                         <div class="form-group">
+                            <label for="jenis_kelamin">Jenis Kelamin</label>
+                            <select id="jenis_kelamin" name="jenis_kelamin" class="form-select" required>
+                                <option value="" >Pilih jenis kelamin</option>
+                                <option value="Laki-laki" {{ $user->jenis_kelamin == 'Laki-laki' ? 'selected' : '' }}>Laki-laki</option>
+                                <option value="Perempuan" {{ $user->jenis_kelamin == 'Perempuan' ? 'selected' : '' }}>Perempuan</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label for="jabatan">Jabatan</label>
                             <select id="jabatan" name="jabatan" class="form-select" required>
                                 <option value="manager" {{ $user->jabatan == 'manager' ? 'selected' : '' }}>Manager</option>
