@@ -36,6 +36,7 @@ class UserController extends Controller
                 'password' => 'required|min:8|confirmed',
                 'password_confirmation' => 'required|same:password',
                 'jabatan' => 'required|in:manager,asisten manager analis,asisten manager preparator ,preparator,analis,mekanik,admin',
+                'tanggal_mulai_bekerja' => 'required|date',
             ], [
                 'password.confirmed' => 'Password dan konfirmasi password tidak cocok.',
                 'password_confirmation.same' => 'Konfirmasi password tidak sesuai.',
@@ -54,6 +55,7 @@ class UserController extends Controller
                 'password' => Hash::make($request->password),
                 'jabatan' => $request->jabatan,
                 'role' => $role,
+                'tanggal_mulai_bekerja' => $request->tanggal_mulai_bekerja,
             ]);
 
             Alert::success('Sukses', 'Akun Telah dibuat');
@@ -88,6 +90,7 @@ class UserController extends Controller
                 'jabatan' => 'required|in:manager,asisten manager analis,asisten manager preparator,preparator,analis,mekanik,admin',
                 'password' => 'nullable|min:8|confirmed', // Validasi untuk password opsional
                 'password_confirmation' => 'nullable|same:password', // Validasi konfirmasi password
+                'tanggal_mulai_bekerja' => 'required|date',
             ], [
                 'password.confirmed' => 'Password dan konfirmasi password tidak cocok.',
                 'password_confirmation.same' => 'Konfirmasi password tidak sesuai.',
@@ -108,6 +111,7 @@ class UserController extends Controller
                 'role' => $role,
                 // Update password jika diisi
                 'password' => $request->password ? Hash::make($request->password) : $personil->password,
+                'tanggal_mulai_bekerja' => $request->tanggal_mulai_bekerja,
             ]);
 
             Alert::success('Sukses', 'Akun Telah diperbarui');

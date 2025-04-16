@@ -46,6 +46,7 @@
                                     <th>Email</th>
                                     <th>Jabatan</th>
                                     <th>Role</th>
+                                    <th>Tanggal Mulai Bekerja</th>
                                     <th class="text-center">Aksi</th>
                                 </tr>
                             </thead>
@@ -57,6 +58,7 @@
                                         <td>{{ $user->email }}</td>
                                         <td>{{ ucfirst($user->jabatan) }}</td>
                                         <td>{{ ucfirst($user->role) }}</td>
+                                        <td>{{ \Carbon\Carbon::parse($user->tanggal_mulai_bekerja)->format('d-m-Y') }}</td>
                                         <td class="text-center">
                                             <!-- Tombol edit -->
                                             <a href="{{ route('personil.edit', $user->id) }}" class="btn btn-warning btn-sm me-1">Edit</a>

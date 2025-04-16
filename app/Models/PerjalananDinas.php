@@ -57,5 +57,44 @@ class PerjalananDinas extends Model
                 $dinas->lama_dinas = null;
             }
         });
+
+        // Tambahkan kuota cuti perjalanan dinas setelah perjalanan dinas selesai
+        static::saved(function ($dinas) {
+            // Periksa apakah perjalanan dinas sudah diproses
+            if ($dinas->is_processed) {
+                return; // Jika sudah diproses, lewati
+            }
+
+            if ($dinas->lama_dinas && $dinas->status === 'selesai') {
+                // Hitung kuota cuti perjalanan dinas (1 hari cuti untuk setiap 10 hari dinas)
+                $cutiTambahan = floor($dinas->lama_dinas / 10);
+
+                if ($cutiTambahan > 0) {
+                    // Ambil jenis cuti perjalanan dinas
+                    $jenisCuti = JenisCuti::where('nama_cuti', 'Cuti Khusus Perjalanan Dinas')->first();
+
+                    if ($jenisCuti) {
+                        // Periksa apakah kuota sudah ada
+                        $cutiQuota = CutiQuota::firstOrCreate(
+                            [
+                                'user_id' => $dinas->user_id,
+                                'jenis_cuti_id' => $jenisCuti->id,
+                            ],
+                            [
+                                'durasi_cuti' => 0,
+                            ]
+                        );
+
+                        // Tambahkan kuota cuti perjalanan dinas
+                        $cutiQuota->durasi_cuti += $cutiTambahan;
+                        $cutiQuota->save();
+
+                        // Tandai perjalanan dinas sebagai sudah diproses
+                        $dinas->is_processed = true;
+                        $dinas->save();
+                    }
+                }
+            }
+        });
     }
 }

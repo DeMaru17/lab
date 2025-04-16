@@ -2,14 +2,15 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Models\JenisCuti;
+use App\Models\CutiQuota;
+use Carbon\Carbon;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
 
     /**
@@ -24,7 +25,63 @@ class User extends Authenticatable
         'password',
         'role',
         'jabatan',
+        'tanggal_mulai_bekerja',
     ];
+
+    /**
+     * Hitung lama bekerja dalam bulan.
+     *
+     * @return int
+     */
+    public function getLamaBekerjaAttribute()
+    {
+        if (!$this->tanggal_mulai_bekerja) {
+            return 0; // Jika tanggal mulai bekerja belum diisi
+        }
+
+        return Carbon::parse($this->tanggal_mulai_bekerja)->diffInMonths(now());
+    }
+
+    /**
+     * Event yang dijalankan saat user dibuat.
+     */
+    protected static function booted()
+    {
+        static::created(function ($user) {
+            if (!$user->tanggal_mulai_bekerja) {
+                return; // Jika tanggal mulai bekerja tidak diisi, lewati
+            }
+
+            $jenisCuti = JenisCuti::all();
+
+            foreach ($jenisCuti as $cuti) {
+                // Periksa apakah jenis cuti adalah "Cuti Tahunan"
+                if ($cuti->nama_cuti === 'Cuti Tahunan') {
+                    // Periksa apakah karyawan telah bekerja selama lebih dari 12 bulan
+                    if ($user->lama_bekerja < 12) {
+                        continue; // Lewati jika belum memenuhi syarat masa kerja
+                    }
+                }
+
+                // Tentukan durasi default untuk jenis cuti
+                $durasiCuti = $cuti->durasi_default;
+
+                // Periksa apakah kuota sudah ada
+                $existingQuota = CutiQuota::where('user_id', $user->id)
+                    ->where('jenis_cuti_id', $cuti->id)
+                    ->first();
+
+                if (!$existingQuota) {
+                    // Buat kuota cuti jika belum ada
+                    CutiQuota::create([
+                        'user_id' => $user->id,
+                        'jenis_cuti_id' => $cuti->id,
+                        'durasi_cuti' => $durasiCuti,
+                    ]);
+                }
+            }
+        });
+    }
 
     /**
      * The attributes that should be hidden for serialization.

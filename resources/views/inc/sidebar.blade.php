@@ -69,11 +69,22 @@
     </li>
 
     <li
-        class="sidebar-item {{ Route::is('#') ? 'active' : '' }}">
+        class="sidebar-item has-sub {{ Route::is('cuti.*') ? 'active' : '' }}">
         <a href="#" class='sidebar-link'>
             <i class="bi bi-person-x-fill"></i>
             <span>Cuti</span>
         </a>
+        <ul class="submenu ">
+            <li class="submenu-item ">
+                <a href="{{route('cuti.create')}}" class="submenu-link">Pengajuan Cuti</a>
+            </li>
+            <li class="submenu-item ">
+                <a href="{{route('cuti.index')}}" class="submenu-link">Daftar Cuti</a>
+            </li>
+            <li class="submenu-item ">
+                <a href="{{route('cuti.quota.index')}}" class="submenu-link">Kuota Cuti</a>
+            </li>
+        </ul>
     </li>
 
     <li

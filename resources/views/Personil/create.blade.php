@@ -47,6 +47,10 @@
                             </select>
                         </div>
                         <div class="form-group">
+                            <label for="tanggal_mulai_bekerja">Tanggal Mulai Bekerja</label>
+                            <input type="date" id="tanggal_mulai_bekerja" name="tanggal_mulai_bekerja" class="form-control" required>
+                        </div>
+                        <div class="form-group">
                             <label for="password">Password</label>
                             <input type="password" id="password" name="password" class="form-control" placeholder="Masukkan password" required>
                         </div>

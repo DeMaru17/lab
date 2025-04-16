@@ -47,6 +47,10 @@
                                 <option value="Perempuan" {{ $user->jenis_kelamin == 'Perempuan' ? 'selected' : '' }}>Perempuan</option>
                             </select>
                         </div>
+                        <div class="form_group">
+                            <label for="tanggal_mulai_bekerja">Tanggal Mulai Bekerja</label>
+                            <input type="date" id="tanggal_mulai_bekerja" name="tanggal_mulai_bekerja" class="form-control" value="{{ $user->tanggal_mulai_bekerja }}" required>
+                        </div>
                         <div class="form-group">
                             <label for="jabatan">Jabatan</label>
                             <select id="jabatan" name="jabatan" class="form-select" required>
