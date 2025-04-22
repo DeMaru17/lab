@@ -28,6 +28,11 @@ class User extends Authenticatable
         'tanggal_mulai_bekerja',
     ];
 
+    public function cutiQuotas()
+    {
+        return $this->hasMany(CutiQuota::class);
+    }
+
     /**
      * Hitung lama bekerja dalam bulan.
      *

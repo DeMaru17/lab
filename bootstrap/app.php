@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withCommands([
         App\Console\Commands\GenerateCutiQuota::class,
+        App\Console\Commands\GrantAnnualLeaveQuota::class,
     ])
     ->withExceptions(function (Exceptions $exceptions) {
         //

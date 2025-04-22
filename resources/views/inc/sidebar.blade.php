@@ -79,10 +79,16 @@
                 <a href="{{route('cuti.create')}}" class="submenu-link">Pengajuan Cuti</a>
             </li>
             <li class="submenu-item ">
+                <a href="{{route('cuti.approval.asisten.list')}}" class="submenu-link">Persetujuan Cuti Asisten Manager</a>
+            </li>
+            <li class="submenu-item ">
+                <a href="{{route('cuti.approval.manager.list')}}" class="submenu-link">Persetujuan Cuti Manager</a>
+            </li>
+            <li class="submenu-item ">
                 <a href="{{route('cuti.index')}}" class="submenu-link">Daftar Cuti</a>
             </li>
             <li class="submenu-item ">
-                <a href="{{route('cuti.quota.index')}}" class="submenu-link">Kuota Cuti</a>
+                <a href="{{route('cuti-quota.index')}}" class="submenu-link">Kuota Cuti</a>
             </li>
         </ul>
     </li>
