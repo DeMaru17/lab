@@ -14,36 +14,62 @@ use Carbon\Carbon;
 use Carbon\CarbonPeriod; // <-- Import CarbonPeriod
 use RealRashid\SweetAlert\Facades\Alert;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Barryvdh\DomPDF\Facade\Pdf; 
 
 class CutiController extends Controller
 {
     /**
      * Menampilkan daftar pengajuan cuti.
      */
-    public function index()
+    public function index(Request $request) // <-- Tambahkan Request $request
     {
         $user = Auth::user();
-        $perPage = 15; // Jumlah item per halaman
+        $perPage = 15;
+        $searchTerm = $request->input('search'); // <-- Ambil kata kunci pencarian
 
-        if ($user->role === 'admin' || $user->role === 'manajemen') {
-            // Admin & Manajemen: lihat semua, paginated
-            $cuti = Cuti::with('user', 'jenisCuti')
-                ->orderBy('created_at', 'desc')
-                ->paginate($perPage);
-        } else {
-            // Personil: lihat milik sendiri, paginated
-            $cuti = Cuti::where('user_id', $user->id)
-                ->with('jenisCuti')
-                ->orderBy('created_at', 'desc')
-                ->paginate($perPage);
+        // Query dasar
+        $query = Cuti::with(['user:id,name,jabatan', 'jenisCuti:id,nama_cuti', 'rejecter:id,name']); // Include rejecter
+
+        // Filter berdasarkan role
+        if ($user->role === 'personil') {
+            $query->where('user_id', $user->id);
         }
+        // Jika user BUKAN personil (admin/manajemen) DAN ADA kata kunci pencarian
+        elseif ($searchTerm) {
+            $query->where(function ($q) use ($searchTerm) {
+                // Cari di kolom 'keperluan' di tabel 'cuti'
+                $q->where('keperluan', 'like', '%' . $searchTerm . '%')
+                    // Atau cari di nama pengaju (relasi 'user')
+                    ->orWhereHas('user', function ($userQuery) use ($searchTerm) {
+                        $userQuery->where('name', 'like', '%' . $searchTerm . '%');
+                    })
+                    // Atau cari di nama jenis cuti (relasi 'jenisCuti')
+                    ->orWhereHas('jenisCuti', function ($jenisCutiQuery) use ($searchTerm) {
+                        $jenisCutiQuery->where('nama_cuti', 'like', '%' . $searchTerm . '%');
+                    });
+                // Tambahkan field lain jika perlu (misal: status, notes)
+                // ->orWhere('status', 'like', '%' . $searchTerm . '%')
+                // ->orWhere('notes', 'like', '%' . $searchTerm . '%');
+            });
+        }
+        // Jika admin/manajemen tapi tidak ada search term, tidak perlu filter tambahan
 
-        // Ambil kuota cuti user yang login (untuk info di view index jika perlu)
+        // Lakukan pagination SETELAH semua filter diterapkan
+        $cuti = $query->orderBy('updated_at', 'desc')->paginate($perPage);
+
+        // --- PENTING: Tambahkan parameter search ke link pagination ---
+        if ($searchTerm) {
+            $cuti->appends(['search' => $searchTerm]);
+        }
+        // --- Akhir Penambahan Parameter ---
+
+        // Ambil kuota hanya untuk info tambahan (jika masih diperlukan)
         $cutiQuota = CutiQuota::where('user_id', $user->id)
             ->get()
             ->keyBy('jenis_cuti_id');
 
-        return view('cuti.index', compact('cuti', 'cutiQuota'));
+        return view('cuti.index', compact('cuti', 'cutiQuota')); // Kirim paginator $cuti ke view
     }
 
     /**
@@ -196,6 +222,181 @@ class CutiController extends Controller
         return redirect()->route('cuti.index'); // Redirect TANPA ->with() lagi
     }
 
+    public function edit(Cuti $cuti) // Route Model Binding
+    {
+        // --- Otorisasi ---
+        // 1. Hanya pemilik pengajuan
+        if (Auth::id() !== $cuti->user_id) {
+            Alert::error('Akses Ditolak', 'Anda tidak berhak mengedit pengajuan ini.');
+            return redirect()->route('cuti.index');
+        }
+        // 2. Hanya status 'pending' atau 'rejected'
+        if (!in_array($cuti->status, ['pending', 'rejected'])) {
+            Alert::error('Gagal', 'Pengajuan cuti dengan status ini tidak dapat diedit.');
+            return redirect()->route('cuti.index');
+        }
+        // --- Akhir Otorisasi ---
+
+        // Ambil data jenis cuti untuk dropdown
+        $jenisCuti = JenisCuti::orderBy('nama_cuti')->get();
+
+        // Kirim data cuti yang akan diedit dan daftar jenis cuti ke view
+        return view('cuti.edit', compact('cuti', 'jenisCuti'));
+    }
+
+    /**
+     * Memperbarui pengajuan cuti yang sudah ada di database.
+     */
+    public function update(Request $request, Cuti $cuti) // Route Model Binding
+    {
+        // --- Otorisasi ---
+        // 1. Hanya pemilik pengajuan
+        if (Auth::id() !== $cuti->user_id) {
+            abort(403, 'Akses ditolak.'); // Bisa pakai abort atau Alert::+redirect
+        }
+        // 2. Hanya status 'pending' atau 'rejected'
+        if (!in_array($cuti->status, ['pending', 'rejected'])) {
+            Alert::error('Gagal', 'Pengajuan cuti dengan status ini tidak dapat diubah.');
+            return redirect()->route('cuti.index');
+        }
+        // --- Akhir Otorisasi ---
+
+
+        // Simpan status original sebelum divalidasi/diubah
+        $originalStatus = $cuti->status;
+
+        // Validasi input (sama seperti store, tapi sesuaikan jika perlu)
+        // Mungkin perlu unique rule yang lebih kompleks jika ada constraint lain
+        $validatedData = $request->validate([
+            'jenis_cuti_id' => 'required|exists:jenis_cuti,id',
+            'mulai_cuti' => 'required|date',
+            'selesai_cuti' => 'required|date|after_or_equal:mulai_cuti',
+            'keperluan' => 'required|string|max:1000',
+            'alamat_selama_cuti' => 'required|string|max:255',
+            'surat_sakit' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
+        ]);
+
+        $startDate = Carbon::parse($validatedData['mulai_cuti']);
+        $endDate = Carbon::parse($validatedData['selesai_cuti']);
+        $jenisCutiId = $validatedData['jenis_cuti_id'];
+        $userId = Auth::id(); // Tetap user yg login
+
+        // --- HITUNG ULANG HARI KERJA ---
+        $workDays = 0;
+        try {
+            $holidayDates = Holiday::whereBetween('tanggal', [$startDate->toDateString(), $endDate->toDateString()])
+                ->pluck('tanggal')
+                ->map(fn($date) => Carbon::parse($date)->format('Y-m-d'))
+                ->toArray();
+            $period = CarbonPeriod::create($startDate, $endDate);
+            foreach ($period as $date) {
+                if (!$date->isWeekend() && !in_array($date->format('Y-m-d'), $holidayDates)) {
+                    $workDays++;
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error("Holiday Calculation Error on Update: " . $e->getMessage());
+            Alert::error('Gagal', 'Terjadi kesalahan saat menghitung ulang durasi hari kerja.');
+            return back()->withInput();
+        }
+        $lamaCuti = $workDays;
+        // --- AKHIR HITUNG ULANG HARI KERJA ---
+
+
+        // --- VALIDASI ULANG KUOTA & CUTI SAKIT ---
+        $jenisCuti = JenisCuti::find($jenisCutiId);
+        if (!$jenisCuti) {
+            return back()->withInput()->withErrors(['error' => 'Jenis cuti tidak valid.']);
+        }
+        $isCutiSakit = (strtolower($jenisCuti->nama_cuti) === 'cuti sakit');
+
+        // 1. Validasi Kuota (jika bukan Cuti Sakit)
+        if (!$isCutiSakit) {
+            $cutiQuota = CutiQuota::where('user_id', $userId)->where('jenis_cuti_id', $jenisCutiId)->first();
+            if ($lamaCuti > 0 && (!$cutiQuota || $cutiQuota->durasi_cuti < $lamaCuti)) {
+                Alert::error('Kuota Tidak Cukup', 'Sisa kuota cuti (' . ($cutiQuota->durasi_cuti ?? 0) . ' hari) tidak mencukupi untuk permintaan ' . $lamaCuti . ' hari kerja.');
+                return back()->withInput();
+            }
+        }
+        // 2. Validasi Surat Sakit
+        $hasExistingSurat = !empty($cuti->surat_sakit);
+        if ($isCutiSakit && $lamaCuti >= 2 && !$request->hasFile('surat_sakit') && !$hasExistingSurat) {
+            // Error HANYA jika wajib (>= 2 hari), tidak upload baru, DAN tidak ada file lama.
+            return back()->withInput()->withErrors(['surat_sakit' => 'Surat sakit wajib diunggah untuk cuti sakit ' . $lamaCuti . ' hari kerja atau lebih.']);
+        }
+        // --- AKHIR VALIDASI ULANG ---
+
+
+        // --- VALIDASI ULANG OVERLAP (Kecualikan data cuti ini sendiri) ---
+        $overlappingCuti = Cuti::where('user_id', $userId)
+            ->where('id', '!=', $cuti->id) // <-- Kecualikan diri sendiri
+            ->whereIn('status', ['pending', 'pending_manager_approval', 'approved']) // Cek status yg relevan
+            ->where(function ($query) use ($startDate, $endDate) {
+                $query->where(function ($q) use ($startDate, $endDate) {
+                    $q->where('mulai_cuti', '>=', $startDate)->where('mulai_cuti', '<=', $endDate);
+                })
+                    ->orWhere(function ($q) use ($startDate, $endDate) {
+                        $q->where('selesai_cuti', '>=', $startDate)->where('selesai_cuti', '<=', $endDate);
+                    })
+                    ->orWhere(function ($q) use ($startDate, $endDate) {
+                        $q->where('mulai_cuti', '<=', $startDate)->where('selesai_cuti', '>=', $endDate);
+                    });
+            })
+            ->exists();
+        if ($overlappingCuti) {
+            Alert::error('Tanggal Bertabrakan', 'Tanggal cuti yang Anda ajukan (' . $startDate->format('d/m/Y') . ' - ' . $endDate->format('d/m/Y') . ') bertabrakan dengan pengajuan cuti lain.');
+            return back()->withInput();
+        }
+        // --- AKHIR VALIDASI OVERLAP ---
+
+
+        // --- PROSES UPDATE DATA ---
+        DB::beginTransaction(); // Mulai transaksi
+        try {
+            // Update data utama
+            $cuti->jenis_cuti_id = $jenisCutiId;
+            $cuti->mulai_cuti = $validatedData['mulai_cuti'];
+            $cuti->selesai_cuti = $validatedData['selesai_cuti'];
+            $cuti->lama_cuti = $lamaCuti; // Update dengan hasil perhitungan baru
+            $cuti->keperluan = $validatedData['keperluan'];
+            $cuti->alamat_selama_cuti = $validatedData['alamat_selama_cuti'];
+
+            // Penanganan File Surat Sakit
+            if ($request->hasFile('surat_sakit')) {
+                // 1. Hapus file lama jika ada
+                if ($cuti->surat_sakit) {
+                    Storage::disk('public')->delete($cuti->surat_sakit);
+                }
+                // 2. Simpan file baru
+                $cuti->surat_sakit = $request->file('surat_sakit')->store('surat_sakit', 'public');
+            }
+            // Jika tidak ada file baru, biarkan file lama (jika ada)
+
+            // Reset status dan data approval/rejection
+            $cuti->status = 'pending'; // <-- Kembali ke pending
+            $cuti->notes = null;
+            $cuti->approved_by_asisten_id = null;
+            $cuti->approved_at_asisten = null;
+            $cuti->approved_by_manager_id = null;
+            $cuti->approved_at_manager = null;
+            $cuti->rejected_by_id = null;
+            $cuti->rejected_at = null;
+
+            $cuti->save(); // Simpan semua perubahan
+
+            DB::commit(); // Konfirmasi transaksi
+
+            Alert::success('Berhasil', 'Pengajuan cuti berhasil diperbarui dan diajukan ulang untuk persetujuan.');
+            return redirect()->route('cuti.index');
+        } catch (\Exception $e) {
+            DB::rollBack(); // Batalkan jika ada error
+            Log::error("Error updating Cuti ID {$cuti->id}: " . $e->getMessage());
+            Alert::error('Gagal', 'Terjadi kesalahan saat menyimpan perubahan pengajuan cuti.');
+            return back()->withInput();
+        }
+        // --- AKHIR PROSES UPDATE ---
+    }
+
     public function cancel(Cuti $cuti) // Route Model Binding
     {
         $user = Auth::user();
@@ -300,7 +501,7 @@ class CutiController extends Controller
             $query->whereRaw('1 = 0');
         }
 
-        $pendingCuti = $query->orderBy('created_at', 'asc')->paginate($perPage);
+        $pendingCuti = $query->orderBy('updated_at', 'desc')->paginate($perPage);
 
         // --- AMBIL DATA KUOTA YANG RELEVAN ---
         $relevantQuotas = collect(); // Default collection kosong
@@ -371,7 +572,7 @@ class CutiController extends Controller
 
             // TODO: Notifikasi ke Manager? (Opsional)
 
-            Alert::success('Berhasil', 'Pengajuan cuti berhasil disetujui (Level 1) dan menunggu persetujuan Manager.');
+            Alert::success('Berhasil', 'Pengajuan cuti berhasil disetujui dan menunggu persetujuan Manager.');
         } catch (\Exception $e) {
             Log::error("Error approving L1 cuti ID {$cuti->id} by user {$approver->id}: " . $e->getMessage());
             Alert::error('Gagal', 'Terjadi kesalahan saat memproses persetujuan.');
@@ -562,6 +763,44 @@ class CutiController extends Controller
         // Redirect ke list yang sesuai
         if ($rejecter->jabatan === 'manager') return redirect()->route('cuti.approval.manager.list');
         else return redirect()->route('cuti.approval.asisten.list');
+    }
+
+    public function downloadPdf(Cuti $cuti) // Route Model Binding
+    {
+        // --- Otorisasi: Siapa yang boleh download? ---
+        // Contoh: Hanya pemilik, atau approver terkait, atau admin/manajemen
+        $user = Auth::user();
+        $isOwner = ($user->id === $cuti->user_id);
+        $isManager = ($user->role === 'manajemen' && $user->jabatan === 'manager');
+        $isAsistenApprover = ($user->id === $cuti->approved_by_asisten_id); // Cek jika user adalah asisten yg approve
+        $isAdmin = ($user->role === 'admin');
+
+        // Tentukan siapa saja yang boleh akses (sesuaikan aturan Anda)
+        if (!($isOwner || $isManager || $isAsistenApprover || $isAdmin)) {
+             // Jika ingin pakai SweetAlert + redirect
+             // Alert::error('Akses Ditolak', 'Anda tidak berhak mengunduh PDF ini.');
+             // return redirect()->back();
+             // Atau cukup abort
+             abort(403, 'ANDA TIDAK BERHAK MENGUNDUH PDF INI.');
+        }
+        // --- Akhir Otorisasi ---
+
+
+        // Eager load relasi yang dibutuhkan untuk ditampilkan di PDF
+        $cuti->load(['user', 'jenisCuti', 'approverAsisten', 'approverManager', 'rejecter']);
+
+        // Nama file PDF yang akan diunduh (contoh)
+        $filename = 'cuti_' . $cuti->user->name . '_' . $cuti->mulai_cuti->format('Ymd') . '.pdf';
+        // Ganti spasi di nama user jika perlu: str_replace(' ', '_', $cuti->user->name)
+
+        // Load view Blade khusus untuk PDF, kirim data $cuti
+        $pdf = Pdf::loadView('cuti.pdf_template', compact('cuti'));
+
+        // Opsi 1: Langsung download file PDF
+        return $pdf->download($filename);
+
+        // Opsi 2: Tampilkan PDF di browser (stream)
+        // return $pdf->stream($filename);
     }
 
 

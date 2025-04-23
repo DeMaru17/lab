@@ -62,7 +62,9 @@ Route::middleware('auth')->group(function () {
 
         // Route untuk Edit/Update (Nanti ditambahkan)
         Route::get('/{cuti}/edit', [CutiController::class, 'edit'])->name('edit');
-        // Route::match(['put', 'patch'], '/{cuti}', [CutiController::class, 'update'])->name('update');
+        Route::match(['put', 'patch'], '/{cuti}', [CutiController::class, 'update'])->name('update');
+
+        Route::get('/{cuti}/pdf', [CutiController::class, 'downloadPdf'])->name('pdf');
 
         // Route untuk Destroy (Jika pilih opsi delete)
         // Route::delete('/{cuti}', [CutiController::class, 'destroy'])->name('destroy');

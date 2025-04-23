@@ -42,8 +42,26 @@
     <section class="section">
         <div class="card">
             <div class="card-header">
-                <h4 class="card-title">Data Pengajuan Cuti</h4>
-                 {{-- TODO: Tambahkan filter berdasarkan status atau tanggal jika diperlukan --}}
+                <div class="row">
+                    <div class="col-md-8 col-12">
+                        <h4 class="card-title">Data Pengajuan Cuti</h4>
+                    </div>
+                    {{-- Hanya tampilkan search form jika bukan personil --}}
+                    @if(Auth::user()->role !== 'personil')
+                    <div class="col-md-4 col-12">
+                        {{-- Form Pencarian --}}
+                        <form action="{{ route('cuti.index') }}" method="GET">
+                            <div class="input-group">
+                                <input type="text" class="form-control" placeholder="Cari Nama/Jenis/Keperluan..." name="search" value="{{ request('search') }}">
+                                <button class="btn btn-primary" type="submit">
+                                    <i class="bi bi-search"></i> Cari
+                                </button>
+                            </div>
+                        </form>
+                        {{-- Akhir Form Pencarian --}}
+                    </div>
+                    @endif
+                </div>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
@@ -68,7 +86,7 @@
                             @forelse ($cuti as $index => $item)
                                 <tr>
                                     <td>{{ $loop->iteration + $cuti->firstItem() - 1 }}</td>
-                                    <td>{{ $item->created_at->format('d/m/Y H:i') }}</td>
+                                    <td>{{ $item->created_at->format('d/m/Y') }}</td>
                                     {{-- Tampilkan Nama Pengaju hanya jika bukan personil biasa --}}
                                     @if (Auth::user()->role !== 'personil')
                                         <td>{{ $item->user->name ?? 'N/A' }}</td>
@@ -106,11 +124,15 @@
                                         <span data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $item->keperluan }}"> {{-- Title berisi teks lengkap --}}
                                             {{ Str::limit($item->keperluan, 20) }} {{-- Batasi tampilan jadi 50 karakter, tambahkan '...' otomatis --}}
                                         </span>
-                                        @if($item->status == 'rejected' && $item->notes)
-                                            <br>
-                                            <small class="text-danger fst-italic" data-bs-toggle="tooltip" title="Alasan Penolakan">
-                                                <i class="bi bi-x-circle-fill"></i> {{ $item->notes }}
-                                            </small>
+                                       {{-- Info Penolakan --}}
+                                        @if($item->status == 'rejected')
+                                        <br>
+                                        <small class="text-danger fst-italic" data-bs-toggle="tooltip" title="Alasan Penolakan">
+                                            <i class="bi bi-x-circle-fill"></i>
+                                            {{ $item->notes ?? 'Alasan tidak diberikan.' }}
+                                            {{-- Tambahkan nama rejecter --}}
+                                            (Ditolak oleh: {{ $item->rejecter->name ?? 'N/A' }})
+                                        </small>
                                         @endif
                                         {{-- Tampilkan Link Surat Sakit jika ada (bisa juga diletakkan di Aksi) --}}
                                         @if($item->surat_sakit)
@@ -120,31 +142,44 @@
                                             </a>
                                         @endif
                                     </td>
-                                    <td>
-                                        {{-- Tombol Edit (jika status rejected) --}}
-                                        @if (Auth::id() == $item->user_id && $item->status == 'rejected')
-                                        <a href="{{ route('cuti.edit', $item->id) }}" {{-- Sesuaikan route edit nanti --}}
-                                        class="btn btn-warning btn-sm d-inline-block" data-bs-toggle="tooltip" title="Edit & Ajukan Ulang">
+                                    <td class="text-nowrap">
+                                    {{-- 1. Tombol Edit (Muncul jika pemilik DAN status pending/rejected) --}}
+                                    @if (Auth::id() == $item->user_id && in_array($item->status, ['pending', 'rejected']))
+                                        <a href="{{ route('cuti.edit', $item->id) }}" 
+                                        class="btn btn-warning btn-sm d-inline-block me-1" data-bs-toggle="tooltip" title="Edit Pengajuan">
                                             <i class="bi bi-pencil-square"></i>
                                         </a>
-                                        @endif
+                                    @endif
 
-                                        {{-- Tombol Batal jika user pemilik DAN status 'pending' ATAU 'approved' DAN belum mulai --}}
-                                        @if (Auth::id() == $item->user_id && in_array($item->status, ['pending', 'approved']) && \Carbon\Carbon::today()->lt($item->mulai_cuti) )
+                                    {{-- 2. Tombol Batal (Muncul jika pemilik DAN status pending/approved DAN belum mulai) --}}
+                                    @if (Auth::id() == $item->user_id && in_array($item->status, ['pending', 'approved']) && \Carbon\Carbon::today()->lt($item->mulai_cuti) )
                                         <form action="{{ route('cuti.cancel', $item->id) }}" method="POST" class="d-inline-block" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan pengajuan cuti ini?')">
                                             @csrf
-                                            {{-- Method POST sesuai definisi route --}}
-                                            <button type="submit" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" title="Batalkan Pengajuan">
-                                                <i class="bi bi-x-circle"></i> {{-- Ikon Batal --}}
+                                            <button type="submit" class="btn btn-danger btn-sm me-1" data-bs-toggle="tooltip" title="Batalkan Pengajuan">
+                                                <i class="bi bi-x-circle"></i>
                                             </button>
                                         </form>
-                                        @endif
+                                    @endif
 
-                                        {{-- Placeholder jika tidak ada aksi lain --}}
-                                        @if (! (Auth::id() == $item->user_id && $item->status == 'rejected') &&
-                                        ! (Auth::id() == $item->user_id && in_array($item->status, ['pending', 'approved']) && \Carbon\Carbon::today()->lt($item->mulai_cuti)) )
-                                        -
+                                    {{-- 3. Placeholder (-) - Logika Diperbaiki --}}
+                                    @if (Auth::id() == $item->user_id) {{-- Cek jika user saat ini adalah pemilik item --}}
+                                        @if (! (in_array($item->status, ['pending', 'rejected'])) &&   {{-- Kondisi: TIDAK bisa diedit --}}
+                                            ! (in_array($item->status, ['pending', 'approved']) && \Carbon\Carbon::today()->lt($item->mulai_cuti)) {{-- Kondisi: TIDAK bisa dibatalkan --}}
+                                            )
+                                            {{-- Tampilkan placeholder HANYA jika KEDUA tombol di atas TIDAK muncul untuk pemilik --}}
+                                            -
                                         @endif
+                                    @else {{-- Jika user saat ini BUKAN pemilik item --}}
+                                        - {{-- Tampilkan placeholder (karena tidak ada aksi untuk non-pemilik) --}}
+                                    @endif
+
+                                    @if ($item->status == 'approved')
+                                    <a href="{{ route('cuti.pdf', $item->id) }}" target="_blank" class="btn btn-light btn-sm d-inline-block" data-bs-toggle="tooltip" title="Unduh PDF">
+                                        <i class="bi bi-printer-fill"></i>
+                                    </a>                                       
+                                    @endif
+
+                                    {{-- 4. Tombol Detail (Muncul untuk semua user) --}}
                                     </td>
                                 </tr>
                             @empty

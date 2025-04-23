@@ -68,28 +68,58 @@
         </a>
     </li>
 
-    <li
-        class="sidebar-item has-sub {{ Route::is('cuti.*') ? 'active' : '' }}">
+    @php
+    $user = Auth::user();
+    $isManajemen = $user->role == 'manajemen';
+    $isAsisten = $isManajemen && in_array($user->jabatan, ['asisten manager analis', 'asisten manager preparator']);
+    $isManager = $isManajemen && $user->jabatan == 'manager';
+
+    // Kondisi untuk class 'active' di menu utama Cuti
+    $isCutiMenuActive = request()->is('cuti*') || request()->is('cuti-quota*') || request()->is('cuti-approval*');
+    // Note: request()->is('cuti*') akan match /cuti, /cuti/create, /cuti/1/edit, dll.
+    // Ini juga akan match /cuti-quota dan /cuti-approval, jadi mungkin cukup request()->is('cuti*')
+    // Mari kita buat lebih spesifik:
+    $isCutiMenuActive = request()->routeIs(['cuti.index','cuti.create','cuti.edit']) || request()->routeIs('cuti-quota.*') || request()->routeIs('cuti.approval.*');
+
+    @endphp
+
+    {{-- Menu Utama Cuti --}}
+    <li class="sidebar-item has-sub {{ $isCutiMenuActive ? 'active' : '' }}">
         <a href="#" class='sidebar-link'>
-            <i class="bi bi-person-x-fill"></i>
+            {{-- Ganti ikon jika perlu - Contoh: Ikon Kalender/Jadwal --}}
+            <i class="bi bi-calendar-week-fill"></i>
             <span>Cuti</span>
         </a>
-        <ul class="submenu ">
-            <li class="submenu-item ">
-                <a href="{{route('cuti.create')}}" class="submenu-link">Pengajuan Cuti</a>
+        {{-- Submenu Cuti --}}
+        <ul class="submenu {{ $isCutiMenuActive ? 'active' : '' }}">
+
+            {{-- 1. Submenu Daftar Cuti (Semua role bisa lihat daftarnya masing-masing) --}}
+            <li class="submenu-item {{ request()->routeIs(['cuti.index', 'cuti.edit', 'cuti.create']) ? 'active' : '' }}">
+                <a href="{{ route('cuti.index') }}" class="submenu-link">Daftar Cuti</a>
             </li>
-            <li class="submenu-item ">
-                <a href="{{route('cuti.approval.asisten.list')}}" class="submenu-link">Persetujuan Cuti Asisten Manager</a>
+
+            {{-- 2. Submenu Persetujuan Asisten (Hanya Asisten Manager) --}}
+            @if ($isAsisten)
+                <li class="submenu-item {{ request()->routeIs('cuti.approval.asisten.list') ? 'active' : '' }}">
+                    <a href="{{ route('cuti.approval.asisten.list') }}" class="submenu-link">Persetujuan Asisten Manager</a>
+                </li>
+            @endif
+
+            {{-- 3. Submenu Persetujuan Manager (Hanya Manager) --}}
+            @if ($isManager)
+                <li class="submenu-item {{ request()->routeIs('cuti.approval.manager.list') ? 'active' : '' }}">
+                    {{-- Ganti route jika sudah dibuat --}}
+                    <a href="{{ route('cuti.approval.manager.list') }}" class="submenu-link">Persetujuan Manager</a>
+                </li>
+            @endif
+
+            {{-- 4. Submenu Kuota Cuti (Semua role bisa lihat/kelola sesuai hak akses di controllernya) --}}
+            <li class="submenu-item {{ request()->routeIs('cuti-quota.*') ? 'active' : '' }}">
+                <a href="{{ route('cuti-quota.index') }}" class="submenu-link">Kuota Cuti</a>
             </li>
-            <li class="submenu-item ">
-                <a href="{{route('cuti.approval.manager.list')}}" class="submenu-link">Persetujuan Cuti Manager</a>
-            </li>
-            <li class="submenu-item ">
-                <a href="{{route('cuti.index')}}" class="submenu-link">Daftar Cuti</a>
-            </li>
-            <li class="submenu-item ">
-                <a href="{{route('cuti-quota.index')}}" class="submenu-link">Kuota Cuti</a>
-            </li>
+
+            
+
         </ul>
     </li>
 

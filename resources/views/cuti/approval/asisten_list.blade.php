@@ -85,23 +85,25 @@
                                         </span>
                                     </td>
                                     {{-- Kolom Aksi --}}
-                                    <td>
+                                    <td class="text-nowrap">
                                         @if ($item->surat_sakit)
-                                            <a href="{{ asset('storage/' . $item->surat_sakit) }}" target="_blank" class="btn btn-secondary btn-sm d-inline-block" data-bs-toggle="tooltip" title="Lihat Surat Sakit">
+                                            <a href="{{ asset('storage/' . $item->surat_sakit) }}" target="_blank" class="btn btn-secondary btn-sm d-inline-block me-1" data-bs-toggle="tooltip" title="Lihat Surat Sakit">
                                                 <i class="bi bi-paperclip"></i> {{-- Ikon paperclip --}}
                                             </a>
                                         @endif
                                         {{-- Tombol Approve L1 --}}
-                                        <form action="{{ route('cuti.approval.asisten.approve', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Konfirmasi Persetujuan:\n\nAnda yakin ingin MENYETUJUI pengajuan cuti ini?\nPengajuan akan diteruskan ke Manager.')">
-                                            @csrf
-                                            @method('PATCH') {{-- Method PATCH sesuai definisi route --}}
-                                            <button type="submit" class="btn btn-success btn-sm" data-bs-toggle="tooltip" title="Setujui">
-                                                <i class="bi bi-check-lg"></i>
-                                            </button>
-                                        </form>
+                                        <button type="button" class="btn btn-success btn-sm me-1"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#approveModal"
+                                                data-cuti-id="{{ $item->id }}"
+                                                data-user-name="{{ $item->user->name ?? 'N/A' }}"
+                                                data-approval-level="asisten" {{-- Tambahkan level approval --}}
+                                                data-bs-toggle="tooltip" title="Setujui">
+                                            <i class="bi bi-check-lg"></i>
+                                        </button>
 
                                         {{-- Tombol Tolak (Trigger Modal) --}}
-                                         <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#rejectModal" data-cuti-id="{{ $item->id }}" data-user-name="{{ $item->user->name ?? 'N/A' }}" data-bs-toggle="tooltip" title="Tolak Pengajuan">
+                                         <button type="button" class="btn btn-danger btn-sm me-1" data-bs-toggle="modal" data-bs-target="#rejectModal" data-cuti-id="{{ $item->id }}" data-user-name="{{ $item->user->name ?? 'N/A' }}" data-bs-toggle="tooltip" title="Tolak Pengajuan">
                                              <i class="bi bi-x-lg"></i>
                                          </button>
 
@@ -128,6 +130,39 @@
         </div>
     </section>
     {{-- Akhir Bagian Tabel --}}
+
+    <div class="modal fade" id="approveModal" tabindex="-1" aria-labelledby="approveModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+              <h5 class="modal-title" id="approveModalLabel">Konfirmasi Persetujuan Cuti</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            {{-- Form di dalam modal --}}
+            <form id="approveForm" method="POST" action=""> {{-- Action diisi oleh JS --}}
+              @csrf
+              @method('PATCH') {{-- Method untuk route approve --}}
+              <div class="modal-body">
+                <p>Anda akan menyetujui pengajuan cuti untuk karyawan: <strong id="approveUserName">Nama Karyawan</strong>.</p>
+                {{-- Pesan tambahan khusus untuk Manager --}}
+                <p id="approveQuotaWarning" class="text-danger fw-bold" style="display: none;">
+                  PENTING: Menyetujui cuti ini akan mengurangi sisa kuota cuti karyawan.
+                </p>
+                {{-- Bisa tambahkan textarea opsional untuk catatan approval jika perlu --}}
+                {{-- <div class="mb-3">
+                  <label for="approveNotes" class="form-label">Catatan Persetujuan (Opsional)</label>
+                  <textarea class="form-control" id="approveNotes" name="approval_notes" rows="3"></textarea>
+                </div> --}}
+                <p>Apakah Anda yakin ingin melanjutkan?</p>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="submit" class="btn btn-success">Ya, Setujui</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
 
 
     <div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
@@ -177,7 +212,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
           rejectUserName.textContent = userName;
           // Buat URL action (Pastikan base URL benar)
-          var actionUrl = `{{ url('/cuti/approval') }}/${cutiId}/reject`; // Gunakan url() helper
+          var actionUrl = `{{ url('/cuti-approval') }}/${cutiId}/reject`; // Gunakan url() helper
           rejectForm.action = actionUrl;
           // Reset textarea dan hapus state invalid jika ada
           rejectNotes.value = '';
@@ -207,6 +242,48 @@ document.addEventListener('DOMContentLoaded', function() {
         // return new bootstrap.Tooltip(tooltipTriggerEl, { html: true })
         return new bootstrap.Tooltip(tooltipTriggerEl)
       })
+
+      // Di dalam listener DOMContentLoaded, setelah script modal reject
+
+    var approveModal = document.getElementById('approveModal');
+    var approveForm = document.getElementById('approveForm');
+    var approveUserName = document.getElementById('approveUserName');
+    var approveQuotaWarning = document.getElementById('approveQuotaWarning'); // Ambil elemen warning kuota
+
+    if(approveModal) {
+    approveModal.addEventListener('show.bs.modal', function (event) {
+      var button = event.relatedTarget;
+      var cutiId = button.getAttribute('data-cuti-id');
+      var userName = button.getAttribute('data-user-name');
+      var level = button.getAttribute('data-approval-level'); // Ambil level approval
+
+      // Set nama user di modal
+      approveUserName.textContent = userName;
+
+      // Tentukan URL action berdasarkan level
+      var actionUrl = "";
+      if (level === 'asisten') {
+          actionUrl = `{{ url('/cuti-approval/asisten') }}/${cutiId}/approve`;
+          approveQuotaWarning.style.display = 'none'; // Sembunyikan warning kuota untuk Asisten
+      } else if (level === 'manager') {
+          actionUrl = `{{ url('/cuti-approval/manager') }}/${cutiId}/approve`;
+          approveQuotaWarning.style.display = 'block'; // Tampilkan warning kuota untuk Manager
+      } else {
+          console.error('Level approval tidak dikenal:', level);
+          // Jangan set action jika level tidak jelas
+      }
+
+      if (actionUrl) {
+         approveForm.action = actionUrl;
+      }
+       // Reset optional notes field if you add it later
+       // const approveNotes = document.getElementById('approveNotes');
+       // if(approveNotes) approveNotes.value = '';
+
+    });
+}
+
+// ... (kode tooltip init tetap ada) ...
 });
 </script>
 @endpush
