@@ -143,43 +143,46 @@
                                         @endif
                                     </td>
                                     <td class="text-nowrap">
-                                    {{-- 1. Tombol Edit (Muncul jika pemilik DAN status pending/rejected) --}}
-                                    @if (Auth::id() == $item->user_id && in_array($item->status, ['pending', 'rejected']))
-                                        <a href="{{ route('cuti.edit', $item->id) }}" 
-                                        class="btn btn-warning btn-sm d-inline-block me-1" data-bs-toggle="tooltip" title="Edit Pengajuan">
-                                            <i class="bi bi-pencil-square"></i>
-                                        </a>
-                                    @endif
-
-                                    {{-- 2. Tombol Batal (Muncul jika pemilik DAN status pending/approved DAN belum mulai) --}}
-                                    @if (Auth::id() == $item->user_id && in_array($item->status, ['pending', 'approved']) && \Carbon\Carbon::today()->lt($item->mulai_cuti) )
-                                        <form action="{{ route('cuti.cancel', $item->id) }}" method="POST" class="d-inline-block" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan pengajuan cuti ini?')">
-                                            @csrf
-                                            <button type="submit" class="btn btn-danger btn-sm me-1" data-bs-toggle="tooltip" title="Batalkan Pengajuan">
-                                                <i class="bi bi-x-circle"></i>
-                                            </button>
-                                        </form>
-                                    @endif
-
-                                    {{-- 3. Placeholder (-) - Logika Diperbaiki --}}
-                                    @if (Auth::id() == $item->user_id) {{-- Cek jika user saat ini adalah pemilik item --}}
-                                        @if (! (in_array($item->status, ['pending', 'rejected'])) &&   {{-- Kondisi: TIDAK bisa diedit --}}
-                                            ! (in_array($item->status, ['pending', 'approved']) && \Carbon\Carbon::today()->lt($item->mulai_cuti)) {{-- Kondisi: TIDAK bisa dibatalkan --}}
-                                            )
-                                            {{-- Tampilkan placeholder HANYA jika KEDUA tombol di atas TIDAK muncul untuk pemilik --}}
+                                        @php $aksiDitampilkan = false; @endphp {{-- Reset flag di setiap awal baris --}}
+                                    
+                                        {{-- 1. Tombol Edit --}}
+                                        @if (Auth::id() == $item->user_id && in_array($item->status, ['pending', 'rejected']))
+                                            <a href="{{ route('cuti.edit', $item->id) }}"
+                                               class="btn btn-warning btn-sm d-inline-block me-1"
+                                               data-bs-toggle="tooltip" title="Edit Pengajuan">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </a>
+                                            @php $aksiDitampilkan = true; @endphp {{-- Tombol Edit tampil --}}
+                                        @endif
+                                    
+                                        {{-- 2. Tombol Batal --}}
+                                        @if (Auth::id() == $item->user_id && in_array($item->status, ['pending', 'approved']) && \Carbon\Carbon::today()->lt($item->mulai_cuti) )
+                                            <form action="{{ route('cuti.cancel', $item->id) }}" method="POST" class="d-inline-block"
+                                                  onsubmit="return confirm('Apakah Anda yakin ingin membatalkan pengajuan cuti ini?')">
+                                                @csrf
+                                                <button type="submit" class="btn btn-danger btn-sm me-1"
+                                                        data-bs-toggle="tooltip" title="Batalkan Pengajuan">
+                                                    <i class="bi bi-x-circle"></i>
+                                                </button>
+                                            </form>
+                                            @php $aksiDitampilkan = true; @endphp {{-- Tombol Batal tampil --}}
+                                        @endif
+                                    
+                                        {{-- 3. Tombol Unduh PDF (Contoh: hanya admin untuk status approved) --}}
+                                        {{-- Sesuaikan kondisi if ini sesuai kebutuhan Anda --}}
+                                        @if ($item->status == 'approved' && Auth::user()->role == 'admin')
+                                            <a href="{{ route('cuti.pdf', $item->id) }}" target="_blank"
+                                               class="btn btn-light btn-sm d-inline-block me-1"
+                                               data-bs-toggle="tooltip" title="Unduh PDF">
+                                                <i class="bi bi-printer-fill"></i>
+                                            </a>
+                                            @php $aksiDitampilkan = true; @endphp {{-- !! TAMBAHKAN INI !! --}}
+                                        @endif
+                                    
+                                        {{-- 4. Placeholder (-) jika TIDAK ADA aksi yang ditampilkan sama sekali --}}
+                                        @if (!$aksiDitampilkan)
                                             -
                                         @endif
-                                    @else {{-- Jika user saat ini BUKAN pemilik item --}}
-                                        - {{-- Tampilkan placeholder (karena tidak ada aksi untuk non-pemilik) --}}
-                                    @endif
-
-                                    @if ($item->status == 'approved')
-                                    <a href="{{ route('cuti.pdf', $item->id) }}" target="_blank" class="btn btn-light btn-sm d-inline-block" data-bs-toggle="tooltip" title="Unduh PDF">
-                                        <i class="bi bi-printer-fill"></i>
-                                    </a>                                       
-                                    @endif
-
-                                    {{-- 4. Tombol Detail (Muncul untuk semua user) --}}
                                     </td>
                                 </tr>
                             @empty

@@ -26,11 +26,25 @@ class User extends Authenticatable
         'role',
         'jabatan',
         'tanggal_mulai_bekerja',
+        'vendor_id',
+        'signature_path',
+    ];
+
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'tanggal_mulai_bekerja' => 'date', // Pastikan ini ada
+        'password' => 'hashed',
     ];
 
     public function cutiQuotas()
     {
         return $this->hasMany(CutiQuota::class);
+    }
+
+    // Di dalam class User
+    public function vendor()
+    {
+        return $this->belongsTo(Vendor::class, 'vendor_id');
     }
 
     /**

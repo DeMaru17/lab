@@ -15,7 +15,7 @@ use Carbon\CarbonPeriod; // <-- Import CarbonPeriod
 use RealRashid\SweetAlert\Facades\Alert;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Barryvdh\DomPDF\Facade\Pdf; 
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class CutiController extends Controller
 {
@@ -776,28 +776,46 @@ class CutiController extends Controller
         $isAdmin = ($user->role === 'admin');
 
         // Tentukan siapa saja yang boleh akses (sesuaikan aturan Anda)
-        if (!($isOwner || $isManager || $isAsistenApprover || $isAdmin)) {
-             // Jika ingin pakai SweetAlert + redirect
-             // Alert::error('Akses Ditolak', 'Anda tidak berhak mengunduh PDF ini.');
-             // return redirect()->back();
-             // Atau cukup abort
-             abort(403, 'ANDA TIDAK BERHAK MENGUNDUH PDF INI.');
+        if (!($isAdmin)) {
+            // Jika ingin pakai SweetAlert + redirect
+            Alert::error('Akses Ditolak', 'Anda tidak berhak mengunduh PDF ini.');
+            return redirect()->back();
+            // Atau cukup abort
+            // abort(403, 'ANDA TIDAK BERHAK MENGUNDUH PDF INI.');
         }
         // --- Akhir Otorisasi ---
 
 
         // Eager load relasi yang dibutuhkan untuk ditampilkan di PDF
-        $cuti->load(['user', 'jenisCuti', 'approverAsisten', 'approverManager', 'rejecter']);
+        // Ganti blok load() yang lama dengan ini:
+        $cuti->load([
+            'user' => function ($query) {
+                $query->select('id', 'name', 'jabatan', 'tanggal_mulai_bekerja', 'signature_path', 'vendor_id') // Pilih kolom user
+                    ->with('vendor:id,name,logo_path'); // Load vendor DARI user
+            },
+            'jenisCuti:id,nama_cuti',
+            'approverAsisten:id,name,jabatan,signature_path',
+            'approverManager:id,name,jabatan,signature_path',
+            'rejecter:id,name'
+        ]);
+        // --- Akhir Eager load ---
 
-        // Nama file PDF yang akan diunduh (contoh)
-        $filename = 'cuti_' . $cuti->user->name . '_' . $cuti->mulai_cuti->format('Ymd') . '.pdf';
-        // Ganti spasi di nama user jika perlu: str_replace(' ', '_', $cuti->user->name)
+        // $debugVendorData = [
+        //     'user_has_vendor' => !is_null($cuti->user?->vendor),
+        //     'vendor_name' => $cuti->user?->vendor?->name,
+        //     'db_logo_path' => $cuti->user?->vendor?->logo_path,
+        //     'check_path' => $cuti->user?->vendor?->logo_path ? public_path('storage/' . $cuti->user->vendor->logo_path) : null,
+        //     'file_exists' => $cuti->user?->vendor?->logo_path ? file_exists(public_path('storage/' . $cuti->user->vendor->logo_path)) : false,
+        // ];
+        // dd($debugVendorData); // <-- Tambahkan ini untuk cek
 
-        // Load view Blade khusus untuk PDF, kirim data $cuti
-        $pdf = Pdf::loadView('cuti.pdf_template', compact('cuti'));
 
-        // Opsi 1: Langsung download file PDF
+
+        $filename = 'cuti_' . str_replace(' ', '_', $cuti->user->name) . '_' . $cuti->mulai_cuti->format('Ymd') . '.pdf';
+        $pdf = Pdf::loadView('cuti.pdf_template', compact('cuti')); // Nama view template PDF Anda
+
         return $pdf->download($filename);
+        // return $pdf->stream($filename); // Jika ingin tampil di browser
 
         // Opsi 2: Tampilkan PDF di browser (stream)
         // return $pdf->stream($filename);

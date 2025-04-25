@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;    // Import DashboardController
 use App\Http\Controllers\PerjalananDinasController; // Import PerjalananDinasController
 use App\Http\Controllers\CutiQuotaController;    // Import CutiQuotaController
 use App\Http\Controllers\CutiController;         // Import CutiController
+use App\Http\Controllers\VendorController;      // Import VendorController
 
 /*
 |--------------------------------------------------------------------------
@@ -41,6 +42,8 @@ Route::middleware('auth')->group(function () {
 
     // Perjalanan Dinas
     Route::resource('perjalanan-dinas', PerjalananDinasController::class);
+
+    Route::resource('vendors', VendorController::class);
 
     // Cuti Quota Management (Hanya Index & Update sesuai kebutuhan user)
     Route::prefix('cuti-quota')->name('cuti-quota.')->group(function () {

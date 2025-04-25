@@ -1,192 +1,168 @@
-<!DOCTYPE html>
-<html lang="id">
+{{-- resources/views/cuti/pdf_template.blade.php --}}
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/> {{-- Penting --}}
     <title>Formulir Pengajuan Cuti - {{ $cuti->user->name ?? 'Karyawan' }}</title>
-    <style>
-        body { font-family: 'Helvetica', 'Arial', sans-serif; font-size: 10pt; line-height: 1.3; }
-        @page { margin: 1cm 1.5cm; }
-        .header { text-align: center; margin-bottom: 15px; }
-        .header .company-name { font-size: 14pt; font-weight: bold; }
-        .header .form-title { font-size: 12pt; font-weight: bold; text-decoration: underline; margin-top: 5px; }
-        table { width: 100%; border-collapse: collapse; }
-        .main-table td { vertical-align: top; padding: 0 5px; }
-        .main-table .left-col { width: 55%; }
-        .main-table .right-col { width: 45%; }
-        .detail-table { width: 100%; margin-bottom: 8px; }
-        .detail-table td { padding: 2px 0; }
-        .detail-table td.label { width: 35%; font-weight: normal; }
-        .detail-table td.separator { width: 2%; text-align: center; }
-        .detail-table td.value { width: 63%; }
-        .hrd-table { width: 100%; margin-top: 5px; border: 1px solid #000; }
-        .hrd-table td { padding: 2px 5px; }
-        .hrd-table .hrd-header { text-align: center; font-weight: bold; font-size: 8pt; border-bottom: 1px solid #000; }
-        .checkbox { display: inline-block; width: 10px; height: 10px; border: 1px solid #000; margin-right: 5px; text-align: center; line-height: 10px; font-size: 8pt; font-weight: bold;}
-        .approval-section { margin-top: 20px; width: 100%; border-collapse: separate; border-spacing: 5px;}
-        .approval-section td { border: 1px solid #000; text-align: center; padding: 5px; vertical-align: top; height: 80px; }
-        .approval-section .label-row td { height: auto; font-weight: bold; font-size: 9pt; border: none; padding-bottom: 2px;}
-        .approval-section .name-row td { height: auto; font-size: 10pt; border: none; padding-top: 50px; }
-        .footer-note { text-align: right; font-size: 8pt; margin-top: -10px; }
-    </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div class="company-name">CSI INDONESIA</div>
-            <div class="form-title">FORMULIR PENGAJUAN CUTI</div>
-        </div>
+<style type="text/css">
+    /* CSS Anda di sini (Disalin dari template Anda) */
+    div { font-family: Tahoma, DejaVu Sans, sans-serif; } /* Tambah fallback unicode */
+    table { width: 100%; border-collapse: collapse; }
+    td { margin-top: 2px; margin-bottom: 2px; margin-left: 10px; font-size: 10pt; vertical-align: top;} /* Atur font size & v-align */
+    .col-judul { font-size: 16pt; text-align: center; font-weight: bold; height: 50px }
+    .col-subjudul { font-size: 12pt; text-align: center; font-weight: bold; }
+    .col-ttd { font-size: 10pt; text-align: center; font-weight: bold; }
+    .col-left { width: 20%; }
+    .col-mid { width: 2%; text-align: center; } /* Pusatkan titik dua */
+    .col-right { width: 33%; }
+    .col-tglcuti { width: 18%; }
+    .col-sd { width: 5%; text-align: center; } /* Class untuk "s/d" */
+    .col-15 { width: 15%; }
+    .col-11 { width: 11%; }
+    .col-33 { width: 33%; }
+    /* CSS untuk bagian HRD yang baru */
+    .hrd-section-table td { padding: 1px 0; } /* Kurangi padding di tabel HRD */
+    .hrd-label { width: 25%; } /* Lebar label Hak/Jumlah Cuti */
+    .hrd-separator { width: 2%; text-align: center; }
+    .hrd-value { width: 23%; } /* Lebar value Hak/Jumlah Cuti */
+    .hrd-label-sisa { width: 25%; } /* Lebar label Sisa Cuti */
+    .hrd-value-sisa { width: 23%; } /* Lebar value Sisa Cuti */
+    .hrd-box { border: 2px solid #000; width: 25%; /* Sesuaikan lebar box paraf */ text-align: center; vertical-align: top;}
+    .hrd-box-header { font-weight: bold; font-size: 9pt; border-bottom: 1px solid #000; padding: 2px; }
+    .hrd-box-space { height: 50px; } /* Ruang untuk paraf */
+    .hrd-note { font-style: italic; font-weight: bold; font-size: 9pt; margin-bottom: 5px; display: block;}
 
-        <table class="main-table">
+    .logo { max-width: 80px; max-height: 35px;}
+    .checkbox { font-family: DejaVu Sans, sans-serif; display: inline-block; width: 12px; height: 12px; border: 1px solid #000; margin-right: 5px; text-align: center; line-height: 12px; font-size: 10pt; font-weight: bold;}
+    .ttd-area { height: 60px; vertical-align: middle; text-align: center; }
+    .ttd-area img { max-height: 55px; height: auto; }
+    .ttd-name { font-size: 10pt; text-align: center; }
+    .ttd-jabatan { font-size: 10pt; text-align: center;}
+    .footer-note { text-align: right; font-size: 8pt; margin-top: 5px; }
+    /* Tambahkan style untuk border tabel TTD */
+    .ttd-table { border: 2px solid #000; margin-top: 0; border-top: none; }
+    .ttd-table td { border: none; } /* Hapus border default cell */
+    .ttd-table .label-row td, .ttd-table .ttd-name td { border-top: 1px solid #000; } /* Garis atas untuk baris nama & label */
+    .ttd-table td:not(:last-child) { border-right: 1px solid #000; } /* Garis kanan antar kolom */
+</style>
+<body>
+    <div style="padding: 10px;">
+        {{-- Header Utama --}}
+        <table style="border: 2px solid #000;">
             <tr>
-                {{-- KOLOM KIRI --}}
-                <td class="left-col">
-                    <table class="detail-table">
-                        <tr>
-                            <td class="label">Nama</td>
-                            <td class="separator">:</td>
-                            <td class="value">{{ $cuti->user->name ?? '-' }}</td>
-                        </tr>
-                        <tr>
-                            <td class="label">Unit Bisnis</td>
-                            <td class="separator">:</td>
-                            <td class="value">Geomin</td> {{-- Sesuai instruksi --}}
-                        </tr>
-                        <tr>
-                            <td class="label">Tanggal Cuti</td>
-                            <td class="separator">:</td>
-                            <td class="value">{{ $cuti->mulai_cuti ? $cuti->mulai_cuti->format('d/m/Y') : '-' }} s/d {{ $cuti->selesai_cuti ? $cuti->selesai_cuti->format('d/m/Y') : '-' }}</td>
-                        </tr>
-                        <tr>
-                            <td class="label">Jumlah Hari Cuti</td>
-                            <td class="separator">:</td>
-                            <td class="value">{{ $cuti->lama_cuti ?? '0' }} hari (kerja)</td>
-                        </tr>
-                         <tr>
-                            <td class="label">Jenis Cuti</td>
-                            <td class="separator">:</td>
-                            <td class="value">
-                                @php
-                                    $isTahunan = str_contains(strtolower($cuti->jenisCuti->nama_cuti ?? ''), 'tahunan');
-                                @endphp
-                                <span class="checkbox">{{ $isTahunan ? 'x' : '' }}</span> Tahunan
-                                <span style="display:inline-block; width: 20px;"></span>
-                                <span class="checkbox">{{ !$isTahunan ? 'x' : '' }}</span> Khusus {{-- Jika bukan tahunan, anggap khusus --}}
-                                {{-- Tampilkan nama jika tidak ada kata tahunan/khusus? --}}
-                                {{-- @if(!$isTahunan && !str_contains(strtolower($cuti->jenisCuti->nama_cuti ?? ''), 'khusus'))
-                                     ({{ $cuti->jenisCuti->nama_cuti ?? '' }})
-                                @endif --}}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="label">Keperluan</td>
-                            <td class="separator">:</td>
-                            <td class="value">{{ $cuti->keperluan ?? '-' }}</td>
-                        </tr>
-                        <tr>
-                            <td class="label">Alamat Selama Cuti</td>
-                            <td class="separator">:</td>
-                            <td class="value">{{ $cuti->alamat_selama_cuti ?? '-' }}</td>
-                        </tr>
-                         <tr>
-                            <td class="label">No. Handphone</td>
-                            <td class="separator">:</td>
-                            <td class="value">-</td> {{-- Sesuai instruksi --}}
-                        </tr>
-                    </table>
-                </td>
-                {{-- KOLOM KANAN --}}
-                <td class="right-col">
-                    <table class="detail-table">
-                        <tr>
-                            <td class="label">NIP</td>
-                            <td class="separator">:</td>
-                            <td class="value">-</td> {{-- Sesuai instruksi --}}
-                        </tr>
-                         <tr>
-                            <td class="label">Jabatan</td>
-                            <td class="separator">:</td>
-                            <td class="value">{{ $cuti->user->jabatan ?? '-' }}</td>
-                        </tr>
-                        <tr>
-                            <td class="label">TMK</td>
-                            <td class="separator">:</td>
-                            <td class="value">-</td> {{-- Sesuai instruksi --}}
-                        </tr>
-                         <tr>
-                            <td class="label">Area</td>
-                            <td class="separator">:</td>
-                            <td class="value">Laboratorium Pulogadung</td> {{-- Sesuai instruksi --}}
-                        </tr>
-                    </table>
-                    {{-- Bagian HRD --}}
-                    <table class="hrd-table">
-                        <tr><td class="hrd-header">diisi oleh HRD</td></tr>
-                        <tr>
-                            <td>
-                                <table class="detail-table" style="margin-bottom: 0;">
-                                    <tr>
-                                        <td class="label">Hak Cuti</td>
-                                        <td class="separator">:</td>
-                                        <td class="value">........... hari</td> {{-- Sesuai instruksi --}}
-                                    </tr>
-                                    <tr>
-                                        <td class="label">Sisa Cuti</td>
-                                        <td class="separator">:</td>
-                                        <td class="value">........... hari</td> {{-- Sesuai instruksi --}}
-                                    </tr>
-                                     <tr>
-                                        <td class="label">Jumlah Cuti</td>
-                                        <td class="separator">:</td>
-                                        <td class="value">{{ $cuti->lama_cuti ?? '0' }} hari</td> {{-- Sesuai instruksi --}}
-                                    </tr>
-                                </table>
-                            </td>
-                        </tr>
-                    </table>
+                <td class="col-judul" style="width: 80%; vertical-align: middle;">FORMULIR PENGAJUAN CUTI</td>
+                <td style="width: 20%; text-align: right; vertical-align: middle;">
+                    {{-- Logika Logo Vendor --}}
+                    @php
+                        $logoPath = null;
+                        $defaultText = 'CSI INDONESIA';
+                        if ($cuti->user?->vendor?->logo_path && file_exists(public_path('storage/' . $cuti->user->vendor->logo_path))) {
+                            $logoPath = public_path('storage/' . $cuti->user->vendor->logo_path);
+                        }
+                    @endphp
+                    @if ($logoPath)
+                        <img src="{{ $logoPath }}" class="logo" alt="Logo Vendor">
+                    @else
+                        {{ $defaultText }}
+                    @endif
                 </td>
             </tr>
         </table>
 
-        {{-- KOLOM PERSETUJUAN / TANDA TANGAN --}}
-        <table class="approval-section">
-            {{-- Baris Label --}}
-            <tr class="label-row">
-                <td>PEMOHON</td>
-                <td>KOLOM PERSETUJUAN</td> {{-- Ini untuk Asisten Manager --}}
-                <td>ATASAN BERIKUTNYA</td> {{-- Ini untuk Manager --}}
-                <td>PARAF HRD</td>
-            </tr>
-            {{-- Baris Ruang Tanda Tangan --}}
+        {{-- Detail dalam Border Box --}}
+        <div style="padding: 10px 10px 0 10px; border-left: 2px solid #000; border-right: 2px solid #000; border-bottom: 2px solid #000;">
+            {{-- ... (Tabel Nama s/d No Handphone seperti sebelumnya) ... --}}
+            <table><tr><td class="col-left">Nama</td><td class="col-mid">:</td><td class="col-right">{{ $cuti->user->name ?? '-' }}</td><td class="col-left">Unit Bisnis</td><td class="col-mid">:</td><td>Geomin</td></tr></table>
+            <table><tr><td class="col-left">NIP</td><td class="col-mid">:</td><td class="col-right">-</td><td class="col-left">Area</td><td class="col-mid">:</td><td>Laboratorium Pulogadung</td></tr></table>
+            <table><tr><td class="col-left">Jabatan</td><td class="col-mid">:</td><td class="col-right">{{ $cuti->user->jabatan ?? '-' }}</td><td class="col-left">TMK</td><td class="col-mid">:</td><td>-</td></tr></table>
+            <table><tr><td class="col-left">Tanggal Cuti</td><td class="col-mid">:</td><td class="col-tglcuti">{{ $cuti->mulai_cuti ? $cuti->mulai_cuti->format('d/m/Y') : '-' }}</td><td class="col-sd">s/d</td><td class="col-tglcuti">{{ $cuti->selesai_cuti ? $cuti->selesai_cuti->format('d/m/Y') : '-' }}</td><td></td></tr></table>
+            <table><tr><td class="col-left">Jumlah Hari Cuti</td><td class="col-mid">:</td><td>{{ $cuti->lama_cuti ?? '0' }} hari (kerja)</td></tr></table>
+            <table>@php $isTahunan = str_contains(strtolower($cuti->jenisCuti->nama_cuti ?? ''), 'tahunan'); @endphp<tr><td class="col-left">Jenis Cuti</td><td class="col-mid">:</td><td class="col-mid"><span class="checkbox">{{ $isTahunan ? '✔' : '' }}</span></td><td class="col-left" style="width: auto;">Tahunan</td><td class="col-mid"><span class="checkbox">{{ !$isTahunan ? '✔' : '' }}</span></td><td class="">Khusus</td></tr></table>
+            <table><tr><td class="col-left">Keperluan</td><td class="col-mid">:</td><td>{{ $cuti->keperluan ?? '-' }}</td></tr></table>
+            <table><tr><td class="col-left">Alamat Selama Cuti</td><td class="col-mid">:</td><td>{{ $cuti->alamat_selama_cuti ?? '-' }}</td></tr></table>
+            <table><tr><td class="col-left">No Handphone</td><td class="col-mid">:</td><td>-</td></tr></table>
+
+            {{-- === AWAL BAGIAN HRD (REVISI) === --}}
+            <table style="width: 100%; margin-top: 10px;">
+                <tr>
+                    {{-- Kolom Kiri untuk Detail --}}
+                    <td style="width: 70%; vertical-align: top;">
+                        <span class="hrd-note"><i>diisi oleh HRD</i></span>
+                        <table class="hrd-section-table">
+                            <tr>
+                                <td class="hrd-label">Hak Cuti</td>
+                                <td class="hrd-separator">:</td>
+                                <td class="hrd-value">........... hari</td>
+                                <td class="hrd-label-sisa">Sisa Cuti</td>
+                                <td class="hrd-separator">:</td>
+                                <td class="hrd-value-sisa">........... hari</td>
+                            </tr>
+                            <tr>
+                                <td class="hrd-label">Jumlah Cuti</td>
+                                <td class="hrd-separator">:</td>
+                                <td class="hrd-value">{{ $cuti->lama_cuti ?? '0' }} hari</td>
+                                <td colspan="3"></td> {{-- Span sisa kolom --}}
+                            </tr>
+                        </table>
+                    </td>
+                    {{-- Kolom Kanan untuk Box Paraf --}}
+                    <td class="hrd-box">
+                        <div class="hrd-box-header">PARAF HRD</div>
+                        <div class="hrd-box-space">&nbsp;</div> {{-- Ruang kosong untuk paraf --}}
+                    </td>
+                </tr>
+            </table>
+            {{-- === AKHIR BAGIAN HRD (REVISI) === --}}
+
+        </div> {{-- End Border Box --}}
+
+        {{-- Kolom Persetujuan Header --}}
+        <table>
             <tr>
-                <td>
-                    {{-- Tampilkan TTD Pemohon jika status approved dan TTD ada? --}}
-                    {{-- Contoh Placeholder: <img src="path/to/signature/pemohon.png" width="80"> --}}
+                <td class="col-subjudul" style="border-left: 2px solid #000;border-right: 2px solid #000; border-top: 2px solid #000; border-bottom: 1px solid #000;">KOLOM PERSETUJUAN</td>
+            </tr>
+        </table>
+
+        {{-- Bagian Tanda Tangan (Tetap sama) --}}
+        <table class="ttd-table">
+            {{-- Baris Label TTD --}}
+            <tr class="col-ttd label-row">
+                <td class="col-33">PEMOHON</td>
+                <td class="col-33">ATASAN BERIKUTNYA</td>
+                <td class="col-33">USER ANTAM</td>
+            </tr>
+             {{-- Baris Gambar TTD --}}
+            <tr class="signature-row">
+                <td class="ttd-area">
+                     @if ($cuti->user && $cuti->user->signature_path && file_exists(public_path('storage/' . $cuti->user->signature_path)))
+                         <img src="{{ public_path('storage/' . $cuti->user->signature_path) }}" alt="TTD Pemohon">
+                     @endif
                 </td>
-                <td>
-                    {{-- Tampilkan TTD Asisten jika status approved dan TTD ada? --}}
+                <td class="ttd-area">
+                     @if ($cuti->approved_by_asisten_id && $cuti->approverAsisten && $cuti->approverAsisten->signature_path && file_exists(public_path('storage/' . $cuti->approverAsisten->signature_path)))
+                         <img src="{{ public_path('storage/' . $cuti->approverAsisten->signature_path) }}" alt="TTD Asisten">
+                     @endif
                 </td>
-                <td>
-                    {{-- Tampilkan TTD Manager jika status approved dan TTD ada? --}}
-                </td>
-                <td>
-                    {{-- TTD HRD? --}}
+                <td class="ttd-area">
+                     @if ($cuti->approved_by_manager_id && $cuti->approverManager && $cuti->approverManager->signature_path && file_exists(public_path('storage/' . $cuti->approverManager->signature_path)))
+                          <img src="{{ public_path('storage/' . $cuti->approverManager->signature_path) }}" alt="TTD Manager">
+                     @endif
                 </td>
             </tr>
              {{-- Baris Nama --}}
-             <tr class="name-row">
+            <tr class="ttd-name">
                  <td>({{ $cuti->user->name ?? '....................' }})</td>
-                 {{-- Tampilkan nama hanya jika sudah pernah diapprove L1 --}}
-                 <td>({{ $cuti->approverAsisten ? $cuti->approverAsisten->name : '....................' }})</td>
-                  {{-- Tampilkan nama hanya jika sudah diapprove L2 --}}
-                 <td>({{ $cuti->approverManager ? $cuti->approverManager->name : '....................' }})</td>
-                 <td>(....................)</td> {{-- Nama HRD? --}}
-             </tr>
-        </table>
-         <div class="footer-note">
-              USER ANTAM {{-- Sesuai PDF Contoh --}}
-         </div>
+                 <td>({{ $cuti->approverAsisten->name ?? '....................' }})</td>
+                 <td>({{ $cuti->approverManager->name ?? '....................' }})</td>
+            </tr>
+            <tr class="ttd-jabatan">
+                <td>{{$cuti->user->jabatan}}</td>
+                <td>{{$cuti->approverAsisten->jabatan}}</td>
+                <td>{{$cuti->approverManager->jabatan}}</td>
+            </tr>
 
-    </div> {{-- End Container --}}
+        </table>
+
+    </div> {{-- End Padding Wrapper --}}
 </body>
 </html>

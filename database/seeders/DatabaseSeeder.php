@@ -19,7 +19,8 @@ class DatabaseSeeder extends Seeder
             // CutiSeeder::class,
             // JenisCutiSeeder::class,
             // CutiQuotaSeeder::class,
-            HolidaySeeder::class,
+            // HolidaySeeder::class,
+            VendorSeeder::class,
         ]);
         $this->command->info('Semua seeder default berhasil dijalankan.');
     }

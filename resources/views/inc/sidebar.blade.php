@@ -138,6 +138,13 @@
         </a>
     </li>
 
+    <li class="sidebar-item {{ Route::is('vendors.*') ? 'active' : '' }}">
+        <a href="{{ route('vendors.index') }}" class='sidebar-link'>
+            <i class="bi bi-grid-1x2-fill"></i>
+            <span>Vendor</span>
+        </a>
+    </li>
+
 
     
     
