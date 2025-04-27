@@ -3,6 +3,11 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Gate; // <-- Import Gate Facade
+use App\Models\Cuti;                 // <-- Import model Cuti
+use App\Policies\CutiPolicy;         // <-- Import CutiPolicy
+use App\Models\PerjalananDinas;      // <-- Import model PerjalananDinas
+use App\Policies\PerjalananDinasPolicy; // <-- Import PerjalananDinasPolicy
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,6 +24,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Daftarkan Policy di sini
+        Gate::policy(Cuti::class, CutiPolicy::class);
+        Gate::policy(PerjalananDinas::class, PerjalananDinasPolicy::class);
+
+        // Daftarkan policy lain jika ada
+        // Gate::policy(User::class, UserPolicy::class);
+        // Gate::policy(Vendor::class, VendorPolicy::class);
     }
 }

@@ -3,109 +3,186 @@
 namespace App\Http\Controllers;
 
 use App\Models\PerjalananDinas;
-use App\Models\User;
+use App\Models\User; // Import User jika diperlukan untuk create/edit
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth; // Import Auth
 use RealRashid\SweetAlert\Facades\Alert;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests; // <-- 1. Import Trait
+use Illuminate\Support\Facades\Log; // <-- 1. Import Log
 
 class PerjalananDinasController extends Controller
 {
-    // Menampilkan daftar perjalanan dinas
-    public function index()
+    use AuthorizesRequests; // <-- 2. Gunakan Trait
+
+    /**
+     * Display a listing of the resource.
+     */
+    public function index(Request $request)
     {
-        $title = 'Hapus Pengguna';
-        $text = "Kamu yakin ingin menghapus pengguna?";
-        confirmDelete($title, $text);
-
-        $user = Auth::user(); // Ambil pengguna yang sedang login
-
-        if (!$user) {
-            return redirect()->route('login')->with('error', 'Anda harus login untuk mengakses halaman ini.');
-        }
-
-        $role = $user->role; // Ambil role pengguna
-        if ($role === 'personil') {
-            // Jika yang login adalah personil, hanya tampilkan perjalanan dinas miliknya
-            $perjalananDinas = PerjalananDinas::where('user_id', $user->id)->get();
-        } elseif ($role === 'admin') {
-            // Jika yang login adalah admin, tampilkan semua data perjalanan dinas
-            $perjalananDinas = PerjalananDinas::with('user')->get();
-        } else {
-            // Jika yang login adalah manajemen, batasi akses
-            return redirect()->back()->with('error', 'Anda tidak memiliki akses ke halaman ini.');
-        }
-
-        return view('perjalanan-dinas.index', compact('perjalananDinas')); // Kirim data ke view
-    }
-
-    // Menampilkan form untuk menambahkan perjalanan dinas baru
-    public function create()
-    {
-        $user = Auth::user(); // Ambil pengguna yang sedang login
+        // Policy 'viewAny' biasanya true, filter data di sini
+        $user = Auth::user();
+        $query = PerjalananDinas::with('user:id,name'); // Eager load user
 
         if ($user->role === 'personil') {
-            // Jika personil, hanya kirimkan data dirinya sendiri
-            $users = [$user];
-        } else {
-            // Jika admin atau manajemen, kirimkan semua data pengguna
-            $users = User::all();
+            $query->where('user_id', $user->id);
+        }
+        // Admin & Manajemen bisa lihat semua (tidak perlu filter tambahan)
+
+        // Tambahkan search jika perlu
+        $searchTerm = $request->input('search');
+        if ($searchTerm && in_array($user->role, ['admin', 'manajemen'])) {
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('jurusan', 'like', '%' . $searchTerm . '%')
+                    ->orWhereHas('user', fn($uq) => $uq->where('name', 'like', '%' . $searchTerm . '%'));
+                // Tambah kolom lain jika perlu
+            });
         }
 
-        return view('perjalanan-dinas.create', compact('users')); // Kirim data pengguna ke view
+        $perjalananDinas = $query->orderBy('tanggal_berangkat', 'desc')->paginate(15);
+
+        if ($searchTerm) {
+            $perjalananDinas->appends(['search' => $searchTerm]);
+        }
+
+        return view('perjalanan-dinas.index', compact('perjalananDinas'));
     }
 
-    // Menyimpan perjalanan dinas baru ke database
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create()
+    {
+        // Cek policy create
+        $this->authorize('create', PerjalananDinas::class);
+
+        // Ambil daftar user HANYA jika yang akses adalah admin
+        $users = [];
+        if (Auth::user()->role === 'admin') {
+            $users = User::orderBy('name')->pluck('name', 'id');
+        }
+
+        return view('perjalanan-dinas.create', compact('users'));
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
     public function store(Request $request)
     {
-        $request->validate([
-            'user_id' => 'required|exists:users,id',
+        // Cek policy create
+        $this->authorize('create', PerjalananDinas::class);
+
+        // Validasi dasar
+        $validatedData = $request->validate([
+            // Jika admin, user_id wajib & harus ada. Jika personil, tidak perlu kirim.
+            'user_id' => Auth::user()->role === 'admin' ? 'required|exists:users,id' : 'nullable',
             'tanggal_berangkat' => 'required|date',
             'perkiraan_tanggal_pulang' => 'required|date|after_or_equal:tanggal_berangkat',
             'jurusan' => 'required|string|max:255',
+            // tanggal_pulang, lama_dinas, status, is_processed dihandle model/update
         ]);
 
-        PerjalananDinas::create($request->all());
-        Alert::success('Sukses', 'Perjalanan dinas berhasil ditambahkan');
-        return redirect()->route('perjalanan-dinas.index')->with('success', 'Perjalanan dinas berhasil ditambahkan.');
-    }
+        // Tentukan user_id
+        $userId = Auth::user()->role === 'admin' ? $validatedData['user_id'] : Auth::id();
 
-    // Menampilkan form untuk mengedit perjalanan dinas
-    public function edit(PerjalananDinas $perjalanan_dina)
-    {
-        $users = User::all(); // Ambil semua data pengguna
-        return view('perjalanan-dinas.edit', compact('perjalanan_dina', 'users')); // Kirim data ke view
-    }
+        // Siapkan data untuk disimpan
+        $createData = [
+            'user_id' => $userId,
+            'tanggal_berangkat' => $validatedData['tanggal_berangkat'],
+            'perkiraan_tanggal_pulang' => $validatedData['perkiraan_tanggal_pulang'],
+            'jurusan' => $validatedData['jurusan'],
+            'status' => 'berlangsung', // Status awal
+            // lama_dinas akan dihitung oleh model event 'saving'
+        ];
 
-    // Memperbarui data perjalanan dinas di database
-    public function update(Request $request, PerjalananDinas $perjalanan_dina)
-    {
-        $request->validate([
-            'user_id' => 'required|exists:users,id',
-            'tanggal_berangkat' => 'required|date',
-            'perkiraan_tanggal_pulang' => 'required|date|after_or_equal:tanggal_berangkat',
-            'tanggal_pulang' => 'nullable|date|after_or_equal:tanggal_berangkat',
-            'jurusan' => 'required|string|max:255',
-        ]);
-
-        // Update data perjalanan dinas
-        $data = $request->all();
-
-        // Jika tanggal_pulang diisi, ubah status menjadi "selesai"
-        if (!empty($data['tanggal_pulang'])) {
-            $data['status'] = 'selesai';
+        try {
+            PerjalananDinas::create($createData);
+            Alert::success('Sukses', 'Data perjalanan dinas berhasil ditambahkan.');
+            return redirect()->route('perjalanan-dinas.index');
+        } catch (\Exception $e) {
+            Log::error("Error creating Perjalanan Dinas: " . $e->getMessage());
+            Alert::error('Gagal', 'Gagal menyimpan data perjalanan dinas.');
+            return redirect()->back()->withInput();
         }
-
-        $perjalanan_dina->update($data);
-
-        Alert::success('Sukses', 'Perjalanan dinas berhasil diperbarui');
-        return redirect()->route('perjalanan-dinas.index')->with('success', 'Perjalanan dinas berhasil diperbarui.');
     }
 
-    // Menghapus perjalanan dinas dari database
-    public function destroy(string $id)
+    /**
+     * Display the specified resource. (Tidak digunakan sesuai info user)
+     */
+    // public function show(PerjalananDinas $perjalananDinas)
+    // {
+    //     $this->authorize('view', $perjalananDinas);
+    //     // return view('perjalanan_dinas.show', compact('perjalananDinas'));
+    // }
+
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(PerjalananDinas $perjalananDina) // <-- Ganti jadi $perjalananDina
     {
-        PerjalananDinas::destroy($id);
-        Alert::success('Sukses', 'Perjalanan dinas berhasil dihapus');
+        $this->authorize('update', $perjalananDina);
+        $users = [];
+        if (Auth::user()->role === 'admin') {
+            $users = User::orderBy('name')->pluck('name', 'id');
+        }
+        // Kirim dengan nama variabel yang sama
+        return view('perjalanan-dinas.edit', compact('perjalananDina', 'users'));
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, PerjalananDinas $perjalananDina)
+    {
+        // Cek policy update
+        $this->authorize('update', $perjalananDina);
+
+        // Validasi (sesuaikan field yg boleh diubah)
+        // Contoh: hanya boleh ubah tanggal pulang, status, jurusan?
+        $validatedData = $request->validate([
+            // user_id sebaiknya tidak diubah saat edit
+            'tanggal_berangkat' => 'required|date',
+            'perkiraan_tanggal_pulang' => 'required|date|after_or_equal:tanggal_berangkat',
+            'tanggal_pulang' => 'nullable|date|after_or_equal:tanggal_berangkat', // Boleh null
+            'jurusan' => 'required|string|max:255',
+            'status' => 'required|in:berlangsung,selesai', // Validasi status
+            // is_processed tidak diinput user
+        ]);
+
+        // Siapkan data update
+        $updateData = $validatedData;
+        // Hapus user_id agar tidak terupdate
+        // unset($updateData['user_id']); // Jika user_id tidak boleh diubah
+
+        try {
+            // Model event 'saving' akan otomatis menghitung ulang lama_dinas
+            // Model event 'saved' akan otomatis cek & tambah kuota jika status 'selesai' & belum diproses
+            $perjalananDina->update($updateData);
+
+            Alert::success('Sukses', 'Data perjalanan dinas berhasil diperbarui.');
+            return redirect()->route('perjalanan-dinas.index');
+        } catch (\Exception $e) {
+            Log::error("Error updating Perjalanan Dinas ID {$perjalananDina->id}: " . $e->getMessage());
+            Alert::error('Gagal', 'Gagal memperbarui data perjalanan dinas.');
+            return redirect()->back()->withInput();
+        }
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(PerjalananDinas $perjalananDinas)
+    {
+        // Cek policy delete
+        $this->authorize('delete', $perjalananDinas);
+
+        try {
+            $perjalananDinas->delete();
+            Alert::success('Sukses', 'Data perjalanan dinas berhasil dihapus.');
+        } catch (\Exception $e) {
+            Log::error("Error deleting Perjalanan Dinas ID {$perjalananDinas->id}: " . $e->getMessage());
+            Alert::error('Gagal', 'Gagal menghapus data perjalanan dinas.');
+        }
         return redirect()->route('perjalanan-dinas.index');
     }
 }

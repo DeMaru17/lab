@@ -95,26 +95,36 @@
                                     <td>{{ $item->mulai_cuti->format('d/m/Y') }} - {{ $item->selesai_cuti->format('d/m/Y') }}</td>
                                     <td class="text-center">{{ $item->lama_cuti }}</td>
                                     <td>
-                                        {{-- Styling Badge untuk Status --}}
+                                        {{-- Logika Status Badge yang Diperbarui --}}
                                         @php
                                             $statusClass = '';
-                                            $statusText = Str::title(str_replace('_', ' ', $item->status)); // Ganti _ jadi spasi, buat title case
+                                            $statusText = ''; // Default kosong
+                        
                                             switch ($item->status) {
                                                 case 'pending':
+                                                    // Jika pending, spesifikkan menunggu siapa
                                                     $statusClass = 'bg-warning';
+                                                    $statusText = 'Menunggu Approval AM'; // Lebih Jelas
                                                     break;
                                                 case 'pending_manager_approval':
                                                     $statusClass = 'bg-info';
-                                                    $statusText = 'Menunggu Approval Manager'; // Teks lebih jelas
+                                                    $statusText = 'Menunggu Approval Manager';
                                                     break;
                                                 case 'approved':
                                                     $statusClass = 'bg-success';
+                                                    $statusText = 'Disetujui';
                                                     break;
                                                 case 'rejected':
                                                     $statusClass = 'bg-danger';
+                                                    $statusText = 'Ditolak';
                                                     break;
+                                                case 'cancelled':
+                                                     $statusClass = 'bg-secondary';
+                                                     $statusText = 'Dibatalkan';
+                                                     break;
                                                 default:
-                                                    $statusClass = 'bg-secondary';
+                                                    $statusClass = 'bg-dark'; // Status tidak dikenal
+                                                    $statusText = Str::title(str_replace('_', ' ', $item->status));
                                             }
                                         @endphp
                                         <span class="badge {{ $statusClass }}">{{ $statusText }}</span>

@@ -16,3 +16,4 @@ Artisan::command('cuti:generate-quota', function () {
 
 Schedule::command('leave:grant-annual')->dailyAt('01:00');
 // -----------------------------------------
+Schedule::command('leave:refresh-all-quotas')->yearlyOn(1, 1, '02:00');

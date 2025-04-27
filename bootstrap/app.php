@@ -11,11 +11,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->alias([
+            'role' => \App\Http\Middleware\CheckRole::class
+        ]);
         //
     })
     ->withCommands([
         App\Console\Commands\GenerateCutiQuota::class,
         App\Console\Commands\GrantAnnualLeaveQuota::class,
+        App\Console\Commands\RefreshAllLeaveQuotas::class,
     ])
     ->withExceptions(function (Exceptions $exceptions) {
         //
