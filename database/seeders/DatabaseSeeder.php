@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             JenisCutiSeeder::class,
             HolidaySeeder::class,
             VendorSeeder::class,
+            OvertimeSeeder::class,
 
         ]);
         $this->command->info('Semua seeder default berhasil dijalankan.');

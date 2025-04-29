@@ -8,6 +8,8 @@ use App\Http\Controllers\PerjalananDinasController; // Import PerjalananDinasCon
 use App\Http\Controllers\CutiQuotaController;    // Import CutiQuotaController
 use App\Http\Controllers\CutiController;         // Import CutiController
 use App\Http\Controllers\VendorController;       // Import VendorController
+use App\Http\Controllers\OvertimeController;    // Import OvertimeController
+use App\Http\Controllers\OvertimeRecapController; // Import OvertimeRecapController
 
 /*
 |--------------------------------------------------------------------------
@@ -87,4 +89,40 @@ Route::middleware('auth')->group(function () {
             // Reject (Bisa oleh Asisten/Manager, otorisasi di controller)
             Route::post('/{cuti}/reject', [CutiController::class, 'reject'])->name('reject');
         });
+
+    Route::prefix('overtimes')->name('overtimes.')->group(function () { // Grup untuk route lembur
+        Route::get('/', [OvertimeController::class, 'index'])->name('index');
+        Route::get('/create', [OvertimeController::class, 'create'])->name('create');
+        Route::post('/', [OvertimeController::class, 'store'])->name('store');
+        Route::get('/{overtime}/edit', [OvertimeController::class, 'edit'])->name('edit');
+        Route::match(['put', 'patch'], '/{overtime}', [OvertimeController::class, 'update'])->name('update');
+        Route::delete('/{overtime}', [OvertimeController::class, 'destroy'])->name('destroy'); // Jika pakai resource, ini sudah ada
+        Route::post('/{overtime}/cancel', [OvertimeController::class, 'cancel'])->name('cancel');
+        Route::post('/bulk-pdf', [OvertimeController::class, 'bulkDownloadPdf'])->name('bulk.pdf');
+
+        // === TAMBAHKAN ROUTE PDF LEMBUR ===
+        Route::get('/{overtime}/pdf', [OvertimeController::class, 'downloadOvertimePdf'])->name('pdf');
+        // === AKHIR ROUTE PDF LEMBUR ===
+    });
+
+
+
+
+    // Lembur Approval
+    Route::prefix('overtime-approval')->name('overtimes.approval.')->middleware(['role:manajemen'])->group(function () {
+        // ... (Route approval lembur: asisten.list, asisten.approve, manager.list, manager.approve, reject, bulk.approve) ...
+        Route::get('/asisten', [OvertimeController::class, 'listForAsisten'])->name('asisten.list');
+        Route::patch('/asisten/{overtime}/approve', [OvertimeController::class, 'approveAsisten'])->name('asisten.approve');
+        Route::get('/manager', [OvertimeController::class, 'listForManager'])->name('manager.list');
+        Route::patch('/manager/{overtime}/approve', [OvertimeController::class, 'approveManager'])->name('manager.approve');
+        Route::post('/{overtime}/reject', [OvertimeController::class, 'reject'])->name('reject');
+        Route::post('/bulk-approve', [OvertimeController::class, 'bulkApprove'])->name('bulk.approve');
+    });
+
+    Route::prefix('overtime-recap')->name('overtimes.recap.')->group(function () {
+        // Halaman utama rekap (menampilkan filter & hasil)
+        Route::get('/', [OvertimeRecapController::class, 'index'])->name('index');
+        // Aksi untuk ekspor ke Excel
+        Route::get('/export', [OvertimeRecapController::class, 'export'])->name('export');
+    });
 }); // Akhir middleware 'auth' group
