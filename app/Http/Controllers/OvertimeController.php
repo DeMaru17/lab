@@ -15,10 +15,11 @@ use RealRashid\SweetAlert\Facades\Alert;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests; // Siapkan untuk Policy nanti
 use Barryvdh\DomPDF\Facade\Pdf; // <-- Import PDF Facade
 use ZipArchive;
+use Illuminate\Support\Str;
 
 class OvertimeController extends Controller
 {
-    // use AuthorizesRequests; // Aktifkan jika pakai Policy
+    use AuthorizesRequests; // Aktifkan jika pakai Policy
 
     private const MONTHLY_OVERTIME_LIMIT_MINUTES = 3240;
 
@@ -27,48 +28,102 @@ class OvertimeController extends Controller
     // Pastikan method index mengirim $monthlyTotals jika diperlukan untuk warning
     public function index(Request $request)
     {
-
-        $query = Overtime::with([
-            'user:id,name,jabatan',
-            'rejecter:id,name' // <-- Pastikan ini ada
-        ]);
-
         $user = Auth::user();
-        $perPage = 15;
-        $searchTerm = $request->input('search');
-        $query = Overtime::with(['user:id,name,jabatan']);
+        $perPage = 50; // Atau sesuai preferensi Anda
+        $searchTerm = $request->input('search'); // Quick search
 
+        // --- Ambil Data untuk Filter Dropdown ---
+        $users = collect();
+        $vendors = collect();
+        if (in_array($user->role, ['admin', 'manajemen'])) {
+            $users = User::orderBy('name')->select('id', 'name')->get();
+            $vendors = Vendor::orderBy('name')->select('id', 'name')->get();
+        }
+
+        // --- Ambil Nilai Filter ---
+        $selectedUserId = $request->input('filter_user_id');
+        $selectedVendorId = $request->input('filter_vendor_id');
+        $selectedStatus = $request->input('filter_status');
+        // Default tanggal: bulan ini, tapi bisa kosong jika tidak difilter
+        $startDate = $request->input('filter_start_date');
+        $endDate = $request->input('filter_end_date');
+
+        // --- Query Dasar ---
+        $query = Overtime::with(['user:id,name,jabatan,vendor_id', 'user.vendor:id,name', 'rejecter:id,name']);
+
+        // --- Terapkan Filter ---
+        // Filter berdasarkan role (selalu diterapkan)
         if ($user->role === 'personil') {
             $query->where('user_id', $user->id);
-        } elseif ($searchTerm && in_array($user->role, ['admin', 'manajemen'])) {
+        }
+
+        // Filter berdasarkan tanggal (jika kedua tanggal diisi)
+        if ($startDate && $endDate) {
+            try {
+                $query->whereBetween('tanggal_lembur', [Carbon::parse($startDate)->startOfDay(), Carbon::parse($endDate)->endOfDay()]);
+            } catch (\Exception $e) {
+                // Abaikan filter tanggal jika format tidak valid
+                Log::warning('Invalid date format received for overtime filter: ' . $e->getMessage());
+            }
+        }
+
+        // Filter berdasarkan status (jika dipilih)
+        if ($selectedStatus) {
+            $query->where('status', $selectedStatus);
+        }
+
+        // Filter berdasarkan user (hanya untuk admin/manajemen)
+        if ($selectedUserId && in_array($user->role, ['admin', 'manajemen'])) {
+            $query->where('user_id', $selectedUserId);
+        }
+
+        // Filter berdasarkan vendor (hanya untuk admin/manajemen)
+        if ($selectedVendorId && in_array($user->role, ['admin', 'manajemen'])) {
+            if ($selectedVendorId === 'is_null') { // Handle internal
+                $query->whereHas('user', fn($q) => $q->whereNull('vendor_id'));
+            } else {
+                $query->whereHas('user', fn($q) => $q->where('vendor_id', $selectedVendorId));
+            }
+        }
+
+        // Filter berdasarkan Quick Search (jika ada dan bukan personil)
+        if ($searchTerm && $user->role !== 'personil') {
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('uraian_pekerjaan', 'like', '%' . $searchTerm . '%')
                     ->orWhereHas('user', fn($uq) => $uq->where('name', 'like', '%' . $searchTerm . '%'));
             });
         }
+        // --- Akhir Terapkan Filter ---
+
+        // Lakukan pagination
         $overtimes = $query->orderBy('tanggal_lembur', 'desc')
-            ->orderBy('jam_mulai', 'desc')
+            ->orderBy('created_at', 'desc') // Urutan kedua berdasarkan waktu dibuat
             ->paginate($perPage);
-        if ($searchTerm) {
-            $overtimes->appends(['search' => $searchTerm]);
-        }
 
-        // Siapkan data total lembur (opsional untuk warning di index)
+        // --- Append Filter ke Pagination Links ---
+        $overtimes->appends($request->except('page')); // Append semua query string kecuali 'page'
+
+        // Siapkan data total lembur bulanan (opsional, bisa membebani jika data banyak)
+        // Pertimbangkan untuk menghapus ini dari index jika tidak terlalu krusial
         $monthlyTotals = [];
-        if ($overtimes->isNotEmpty()) {
-            $userIds = $overtimes->pluck('user_id')->unique()->toArray();
-            $usersOnPage = User::whereIn('id', $userIds)->with('vendor')->get()->keyBy('id'); // Load vendor juga
-            foreach ($usersOnPage as $listUser) {
-                $monthlyTotals[$listUser->id] = $this->getCurrentMonthOvertimeTotal($listUser);
-            }
-        }
+        // ... (logika ambil monthlyTotals seperti sebelumnya jika masih diperlukan) ...
 
-        return view('overtimes.index', compact('overtimes', 'monthlyTotals'));
+        return view('overtimes.index', compact(
+            'overtimes',
+            'monthlyTotals',
+            'users', // Kirim data user untuk filter
+            'vendors', // Kirim data vendor untuk filter
+            'selectedUserId', // Kirim nilai filter terpilih
+            'selectedVendorId',
+            'selectedStatus',
+            'startDate',
+            'endDate'
+        ));
     }
 
     public function create()
     {
-        // $this->authorize('create', Overtime::class);
+        $this->authorize('create', Overtime::class);
         $users = [];
         if (Auth::user()->role === 'admin') {
             $users = User::whereIn('role', ['personil', 'admin'])->orderBy('name')->pluck('name', 'id');
@@ -83,17 +138,26 @@ class OvertimeController extends Controller
 
     public function store(Request $request)
     {
-        // $this->authorize('create', Overtime::class);
+        $this->authorize('create', Overtime::class);
         $validatedData = $request->validate([
             'user_id' => Auth::user()->role === 'admin' ? 'required|exists:users,id' : 'nullable',
             'tanggal_lembur' => 'required|date',
             'jam_mulai' => 'required|date_format:H:i',
-            'jam_selesai' => 'required|date_format:H:i', // Validasi 'after' bisa rumit jika lewat hari, handle di model/logika
+            'jam_selesai' => 'required|date_format:H:i', // Validasi 'after' dihandle di logika/model
             'uraian_pekerjaan' => 'required|string|max:1000',
         ]);
 
         $userId = Auth::user()->role === 'admin' ? $validatedData['user_id'] : Auth::id();
-        $targetUser = User::with('vendor')->find($userId); // Load vendor untuk cek periode
+        $targetUser = User::with('vendor')->find($userId);
+        $tanggalLembur = Carbon::parse($validatedData['tanggal_lembur']); // Gunakan tanggal ini untuk cek overlap
+
+        // --- VALIDASI OVERLAP (TAMBAHKAN DI SINI) ---
+        if ($this->checkOverlap($userId, $tanggalLembur, $tanggalLembur)) { // Cek overlap pada tanggal yg diajukan
+            Alert::error('Tanggal Bertabrakan', 'Anda sudah memiliki pengajuan lembur lain (pending/approved) pada tanggal ' . $tanggalLembur->format('d/m/Y') . '.');
+            return back()->withInput();
+        }
+        // --- AKHIR VALIDASI OVERLAP ---
+
 
         // Hitung durasi sementara
         $tempStartTime = Carbon::parse($validatedData['jam_mulai']);
@@ -104,16 +168,19 @@ class OvertimeController extends Controller
         $newDurationMinutes = $tempStartTime->diffInMinutes($tempEndTime);
 
         // Cek batas lembur bulanan
-        $currentMonthTotal = $this->getCurrentMonthOvertimeTotal($targetUser, Carbon::parse($validatedData['tanggal_lembur']));
+        $currentMonthTotal = $this->getCurrentMonthOvertimeTotal($targetUser, $tanggalLembur);
         $totalAfterSubmit = $currentMonthTotal + $newDurationMinutes;
         $exceedsLimit = ($totalAfterSubmit > self::MONTHLY_OVERTIME_LIMIT_MINUTES);
 
+        // Siapkan data untuk disimpan
         $createData = $validatedData;
         $createData['user_id'] = $userId;
         $createData['status'] = 'pending';
 
         try {
             Overtime::create($createData); // Model event akan hitung durasi_menit
+
+            // Beri notifikasi sukses, tambahkan warning jika batas terlewati
             if ($exceedsLimit) {
                 $hoursOver = round(($totalAfterSubmit - self::MONTHLY_OVERTIME_LIMIT_MINUTES) / 60, 1);
                 Alert::success('Berhasil Diajukan', 'Pengajuan lembur berhasil disimpan.')
@@ -122,7 +189,9 @@ class OvertimeController extends Controller
             } else {
                 Alert::success('Berhasil Diajukan', 'Pengajuan lembur berhasil disimpan.');
             }
-            return redirect()->route('overtimes.index');
+
+            return redirect()->route('overtimes.index'); // Sesuaikan nama route jika berbeda
+
         } catch (\Exception $e) {
             Log::error("Error creating Overtime: " . $e->getMessage());
             Alert::error('Gagal', 'Gagal menyimpan data lembur.');
@@ -132,7 +201,7 @@ class OvertimeController extends Controller
 
     public function edit(Overtime $overtime)
     {
-        // $this->authorize('update', $overtime);
+        $this->authorize('update', $overtime);
         $users = [];
         if (Auth::user()->role === 'admin') {
             $users = User::orderBy('name')->pluck('name', 'id');
@@ -142,53 +211,90 @@ class OvertimeController extends Controller
 
     public function update(Request $request, Overtime $overtime)
     {
-        // $this->authorize('update', $overtime);
+        $this->authorize('update', $overtime);
+
+
+        // Validasi input
         $validatedData = $request->validate([
             'tanggal_lembur' => 'required|date',
             'jam_mulai' => 'required|date_format:H:i',
-            'jam_selesai' => 'required|date_format:H:i', // Perlu validasi after yg benar jika edit
+            'jam_selesai' => 'required|date_format:H:i', // Validasi 'after' lebih kompleks jika lewat hari, dihandle di model
             'uraian_pekerjaan' => 'required|string|max:1000',
+            // Tidak ada validasi status di sini karena akan direset
         ]);
 
-        // Cek batas lembur sebelum update
-        $targetUser = $overtime->user()->with('vendor')->first(); // Load vendor
-        $tempStartTime = Carbon::parse($validatedData['jam_mulai']);
-        $tempEndTime = Carbon::parse($validatedData['jam_selesai']);
-        if ($tempEndTime->lessThanOrEqualTo($tempStartTime)) {
-            $tempEndTime->addDay();
+        $startDate = Carbon::parse($validatedData['tanggal_lembur']); // Tanggal lembur baru
+        $startTime = Carbon::parse($validatedData['jam_mulai']);
+        $endTime = Carbon::parse($validatedData['jam_selesai']);
+        $userId = $overtime->user_id; // User ID tetap sama
+        $targetUser = $overtime->user()->with('vendor')->first(); // Ambil user dengan vendor
+
+        // --- HITUNG ULANG DURASI (sementara, final di model event) ---
+        $tempEndTimeForCalc = $endTime->copy(); // Salin agar tidak mengubah objek asli
+        if ($tempEndTimeForCalc->lessThanOrEqualTo($startTime)) {
+            $tempEndTimeForCalc->addDay();
         }
-        $newDurationMinutes = $tempStartTime->diffInMinutes($tempEndTime);
+        $newLamaMenit = $startTime->diffInMinutes($tempEndTimeForCalc);
+        // --- AKHIR HITUNG ULANG DURASI ---
 
-        $currentMonthTotal = $this->getCurrentMonthOvertimeTotal($targetUser, Carbon::parse($validatedData['tanggal_lembur']), $overtime->id);
-        $totalAfterUpdate = $currentMonthTotal + $newDurationMinutes;
+        // --- VALIDASI ULANG BATAS LEMBUR ---
+        $currentMonthTotal = $this->getCurrentMonthOvertimeTotal($targetUser, $startDate, $overtime->id); // Kecualikan ID ini
+        $totalAfterUpdate = $currentMonthTotal + $newLamaMenit;
         $exceedsLimit = ($totalAfterUpdate > self::MONTHLY_OVERTIME_LIMIT_MINUTES);
+        // --- AKHIR VALIDASI BATAS LEMBUR ---
 
-        $updateData = $validatedData;
-        // Reset approval jika data diubah?
-        // $updateData['status'] = 'pending';
-        // ... reset approval fields ...
+        // --- VALIDASI ULANG OVERLAP ---
+        if ($this->checkOverlap($userId, $startDate, $startDate, $overtime->id)) { // Cek overlap hanya pada tanggal lembur baru
+            Alert::error('Tanggal Bertabrakan', 'Tanggal lembur yang Anda ajukan bertabrakan dengan pengajuan lain.');
+            return back()->withInput();
+        }
+        // --- AKHIR VALIDASI OVERLAP ---
 
+
+        // --- PROSES UPDATE DATA ---
+        DB::beginTransaction();
         try {
+            // Siapkan data untuk diupdate dari hasil validasi
+            $updateData = $validatedData;
+
+            // !! BAGIAN PENTING: RESET STATUS DAN APPROVAL !!
+            $updateData['status'] = 'pending'; // Kembalikan ke pending
+            $updateData['notes'] = null;       // Hapus catatan reject sebelumnya
+            $updateData['approved_by_asisten_id'] = null;
+            $updateData['approved_at_asisten'] = null;
+            $updateData['approved_by_manager_id'] = null;
+            $updateData['approved_at_manager'] = null;
+            $updateData['rejected_by_id'] = null;
+            $updateData['rejected_at'] = null;
+            $updateData['last_reminder_sent_at'] = null; // Reset reminder juga
+
+            // Lakukan update (Model event 'saving' akan menghitung ulang durasi_menit)
             $overtime->update($updateData);
+
+            DB::commit(); // Konfirmasi transaksi
+
+            // Beri notifikasi
             if ($exceedsLimit) {
                 $hoursOver = round(($totalAfterUpdate - self::MONTHLY_OVERTIME_LIMIT_MINUTES) / 60, 1);
-                Alert::success('Berhasil Diperbarui', 'Data lembur berhasil diperbarui.')
+                Alert::success('Berhasil Diperbarui', 'Pengajuan lembur berhasil diperbarui dan diajukan ulang.')
                     ->persistent(true)
                     ->warning('Perhatian!', 'Total jam lembur bulan ini telah melebihi batas 54 jam (Sekitar ' . $hoursOver . ' jam lebih).');
             } else {
-                Alert::success('Berhasil Diperbarui', 'Data lembur berhasil diperbarui.');
+                Alert::success('Berhasil Diperbarui', 'Pengajuan lembur berhasil diperbarui dan diajukan ulang.');
             }
-            return redirect()->route('overtimes.index');
+            return redirect()->route('overtimes.index'); // Sesuaikan nama route
+
         } catch (\Exception $e) {
+            DB::rollBack();
             Log::error("Error updating Overtime ID {$overtime->id}: " . $e->getMessage());
-            Alert::error('Gagal', 'Gagal memperbarui data lembur.');
-            return redirect()->back()->withInput();
+            Alert::error('Gagal', 'Gagal menyimpan perubahan pengajuan lembur.');
+            return back()->withInput();
         }
     }
 
     public function destroy(Overtime $overtime)
     {
-        // $this->authorize('delete', $overtime);
+        $this->authorize('delete', $overtime);
         try {
             $overtime->delete();
             Alert::success('Sukses', 'Data lembur berhasil dihapus.');
@@ -201,7 +307,7 @@ class OvertimeController extends Controller
 
     public function cancel(Overtime $overtime)
     {
-        // $this->authorize('cancel', $overtime);
+        $this->authorize('cancel', $overtime);
         if (Auth::id() !== $overtime->user_id || !in_array($overtime->status, ['pending', 'approved'])) {
             Alert::error('Gagal', 'Anda tidak dapat membatalkan pengajuan lembur ini.');
             return redirect()->route('overtimes.index');
@@ -267,38 +373,18 @@ class OvertimeController extends Controller
     public function approveAsisten(Overtime $overtime) // Gunakan Route Model Binding
     {
         // Otorisasi menggunakan Policy (contoh)
-        // $this->authorize('approveAsisten', $overtime);
-
-        // Otorisasi Manual Sederhana (jika belum pakai policy)
-        $approver = Auth::user();
-        if ($approver->role !== 'manajemen' || $overtime->status !== 'pending') {
-            Alert::error('Akses Ditolak', 'Aksi tidak diizinkan.');
-            return redirect()->back();
-        }
-        $pengajuJabatan = $overtime->user->jabatan;
-        $canApprove = false;
-        if ($approver->jabatan === 'asisten manager analis' && in_array($pengajuJabatan, ['analis', 'admin'])) $canApprove = true;
-        elseif ($approver->jabatan === 'asisten manager preparator' && in_array($pengajuJabatan, ['preparator', 'mekanik', 'admin'])) $canApprove = true;
-        if (!$canApprove) {
-            Alert::error('Akses Ditolak', 'Anda tidak berwenang menyetujui pengajuan ini.');
-            return redirect()->back();
-        }
-        // --- Akhir Otorisasi Manual ---
+        $this->authorize('approveAsisten', $overtime);
 
         try {
-            $overtime->approved_by_asisten_id = $approver->id;
+            $overtime->approved_by_asisten_id = Auth::id();
             $overtime->approved_at_asisten = now();
-            $overtime->status = 'pending_manager_approval'; // Lanjut ke L2
+            $overtime->status = 'pending_manager_approval';
             $overtime->save();
-
-            // TODO: Notifikasi ke Manager?
-
-            Alert::success('Berhasil', 'Pengajuan lembur disetujui & menunggu persetujuan Manager.');
+            Alert::success('Berhasil', 'Pengajuan lembur disetujui (L1)...');
         } catch (\Exception $e) {
-            Log::error("Error approving L1 Overtime ID {$overtime->id} by user {$approver->id}: " . $e->getMessage());
-            Alert::error('Gagal', 'Gagal memproses persetujuan L1');
+            Log::error("Error approving L1 Overtime ID {$overtime->id}: " . $e->getMessage());
+            Alert::error('Gagal', 'Gagal memproses persetujuan L1.');
         }
-        // Pastikan nama route benar
         return redirect()->route('overtimes.approval.asisten.list');
     }
 
@@ -341,38 +427,24 @@ class OvertimeController extends Controller
     public function approveManager(Overtime $overtime)
     {
         // Otorisasi menggunakan Policy (contoh)
-        // $this->authorize('approveManager', $overtime);
-
-        // Otorisasi Manual Sederhana
-        $approver = Auth::user();
-        if ($approver->role !== 'manajemen' || $approver->jabatan !== 'manager' || $overtime->status !== 'pending_manager_approval') {
-            Alert::error('Akses Ditolak', 'Aksi tidak diizinkan.');
-            return redirect()->back();
-        }
-        // --- Akhir Otorisasi Manual ---
+        $this->authorize('approveManager', $overtime);
 
         DB::beginTransaction(); // Lembur tidak ubah kuota, tapi transaksi tetap baik
         try {
-            // Update Status Lembur
-            $overtime->approved_by_manager_id = $approver->id;
+            $overtime->approved_by_manager_id = Auth::id();
             $overtime->approved_at_manager = now();
-            $overtime->status = 'approved'; // Status Final
-            $overtime->rejected_by_id = null; // Reset rejection
+            $overtime->status = 'approved';
+            $overtime->rejected_by_id = null;
             $overtime->rejected_at = null;
             $overtime->notes = null;
             $overtime->save();
-
             DB::commit();
-
-            // TODO: Notifikasi ke Pengaju?
-
-            Alert::success('Berhasil', 'Pengajuan lembur untuk ' . $overtime->user->name . ' telah disetujui.');
+            Alert::success('Berhasil', 'Pengajuan lembur ... telah disetujui.');
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Error approving L2 Overtime ID {$overtime->id} by manager {$approver->id}: " . $e->getMessage());
+            Log::error("Error approving L2 Overtime ID {$overtime->id}: " . $e->getMessage());
             Alert::error('Gagal', 'Gagal memproses persetujuan L2.');
         }
-        // Pastikan nama route benar
         return redirect()->route('overtimes.approval.manager.list');
     }
 
@@ -382,41 +454,16 @@ class OvertimeController extends Controller
     public function reject(Request $request, Overtime $overtime)
     {
         // Otorisasi menggunakan Policy (contoh)
-        // $this->authorize('reject', $overtime);
+        $this->authorize('reject', $overtime);
 
-        $rejecter = Auth::user();
         $validated = $request->validate(['notes' => 'required|string|max:500']);
 
-        // --- Otorisasi Manual ---
-        if ($rejecter->role !== 'manajemen') {
-            Alert::error('Akses Ditolak');
-            return redirect()->back();
-        }
-        $canReject = false;
-        if ($overtime->status === 'pending') {
-            $pengajuJabatan = $overtime->user->jabatan;
-            if (($rejecter->jabatan === 'asisten manager analis' && in_array($pengajuJabatan, ['analis', 'admin'])) ||
-                ($rejecter->jabatan === 'asisten manager preparator' && in_array($pengajuJabatan, ['preparator', 'mekanik', 'admin']))
-            ) {
-                $canReject = true;
-            }
-        } elseif ($overtime->status === 'pending_manager_approval') {
-            if ($rejecter->jabatan === 'manager') {
-                $canReject = true;
-            }
-        }
-        if (!$canReject || !in_array($overtime->status, ['pending', 'pending_manager_approval'])) {
-            Alert::error('Akses Ditolak', 'Anda tidak dapat menolak pengajuan ini.');
-            return redirect()->back();
-        }
-        // --- Akhir Otorisasi Manual ---
-
         try {
-            $overtime->rejected_by_id = $rejecter->id;
+            $overtime->rejected_by_id = Auth::id();
             $overtime->rejected_at = now();
             $overtime->status = 'rejected';
             $overtime->notes = $validated['notes'];
-            if ($rejecter->jabatan === 'manager') { // Reset L1 jika direject L2
+            if (Auth::user()->jabatan === 'manager') { // Reset L1 jika L2 reject
                 $overtime->approved_by_asisten_id = null;
                 $overtime->approved_at_asisten = null;
             }
@@ -427,19 +474,19 @@ class OvertimeController extends Controller
             Alert::error('Gagal', 'Gagal memproses penolakan.');
         }
 
-        if ($rejecter->jabatan === 'manager') return redirect()->route('overtimes.approval.manager.list');
+        if (Auth::user()->jabatan === 'manager') return redirect()->route('overtimes.approval.manager.list');
         else return redirect()->route('overtimes.approval.asisten.list');
     }
 
     public function bulkApprove(Request $request)
     {
+        $this->authorize('bulkApprove', Overtime::class);
         // Validasi input dasar
         $validated = $request->validate([
             'selected_ids'   => 'required|array', // Pastikan array ID dikirim
             'selected_ids.*' => 'required|integer|exists:overtimes,id', // Setiap ID harus ada di tabel overtimes
             'approval_level' => 'required|in:asisten,manager', // Pastikan level approval valid
         ]);
-
         $selectedIds = $validated['selected_ids'];
         $approvalLevel = $validated['approval_level'];
         $approver = Auth::user();
@@ -581,14 +628,8 @@ class OvertimeController extends Controller
     public function downloadOvertimePdf(Overtime $overtime) // Route Model Binding
     {
         // --- Otorisasi: Siapa yang boleh download? ---
-        // Anda bisa gunakan Policy jika sudah dibuat: $this->authorize('downloadPdf', $overtime);
-        // Contoh Otorisasi Manual: Hanya Admin atau Pemilik (jika sudah approved?)
-        $user = Auth::user();
-        if (!($user->role === 'admin' || $user->id === $overtime->user_id)) {
-            Alert::error('Akses Ditolak', 'Anda tidak berhak mengunduh PDF lembur ini.');
-            return redirect()->back();
-        }
-        // --- Akhir Otorisasi ---
+        $this->authorize('downloadPdf', $overtime);
+
 
         // --- Eager load relasi yang dibutuhkan ---
         $overtime->load([
@@ -604,11 +645,11 @@ class OvertimeController extends Controller
         ]);
         // --- Akhir Eager load ---
 
-        // Buat nama file
-        $filename = 'lembur_'
-            . str_replace(' ', '_', $overtime->user->name ?? 'user') . '_'
-            . ($overtime->tanggal_lembur ? $overtime->tanggal_lembur->format('Ymd') : 'nodate')
-            . '.pdf';
+        $tanggalLemburFormatted = $overtime->tanggal_lembur ? $overtime->tanggal_lembur->format('dmy') : 'nodate';
+        // Ganti spasi di nama user dengan underscore, buat lowercase (opsional)
+        $namaPengajuFormatted = Str::slug($overtime->user->name ?? 'user', '_');
+
+        $filename =  $tanggalLemburFormatted . '_lembur' . '_' . $namaPengajuFormatted . '.pdf';
 
         // Load view Blade khusus untuk PDF lembur, kirim data $overtime
         try {
@@ -632,82 +673,97 @@ class OvertimeController extends Controller
             'selected_ids'   => 'required|array',
             'selected_ids.*' => 'required|integer|exists:overtimes,id',
         ]);
-
         $selectedIds = $validated['selected_ids'];
 
-        // Otorisasi: Siapa yang boleh bulk download? (Contoh: Hanya Admin)
+        // Otorisasi: Hanya Admin
         if (Auth::user()->role !== 'admin') {
             Alert::error('Akses Ditolak', 'Anda tidak berhak melakukan aksi ini.');
             return redirect()->back();
         }
 
-        // Ambil data lembur yang dipilih lengkap dengan relasi
+        // Ambil data lembur yang dipilih
         $overtimesToExport = Overtime::with([
-            'user' => function ($query) {
-                $query->select('id', 'name', 'jabatan', 'signature_path', 'vendor_id')
-                    ->with('vendor:id,name,logo_path');
-            },
+            'user' => fn($q) => $q->select('id', 'name', 'jabatan', 'signature_path', 'vendor_id')->with('vendor:id,name,logo_path'),
             'approverAsisten:id,name,jabatan,signature_path',
             'approverManager:id,name,jabatan,signature_path',
-            'rejecter:id,name' // Jika perlu info rejecter di PDF
-        ])
-            ->whereIn('id', $selectedIds)
-            ->get();
+            'rejecter:id,name'
+        ])->whereIn('id', $selectedIds)->get();
 
         if ($overtimesToExport->isEmpty()) {
-            Alert::warning('Tidak Ada Data', 'Tidak ada data lembur yang valid untuk diekspor.');
+            Alert::warning('Tidak Ada Data', 'Tidak ada data lembur valid untuk diekspor.');
             return redirect()->back();
         }
 
         // --- Proses Pembuatan ZIP ---
         $zip = new ZipArchive;
-        // Buat nama file zip unik di direktori temporary storage
-        $zipFileName = 'rekap_lembur_bulk_' . time() . '.zip';
-        $zipPath = storage_path('app/temp/' . $zipFileName); // Simpan di storage/app/temp
+        $zipFileName = 'lembur_' . date('dmY_His') . '.zip';
+        $tempDir = storage_path('app/temp'); // Direktori temporary
+        $zipPath = $tempDir . '/' . $zipFileName;
 
-        // Pastikan direktori temp ada
+        // Pastikan direktori temp ada dan writable
         if (!Storage::exists('temp')) {
             Storage::makeDirectory('temp');
         }
+        if (!is_writable($tempDir)) {
+            Log::error("Temporary directory not writable: " . $tempDir);
+            Alert::error('Error Server', 'Direktori penyimpanan sementara tidak dapat ditulis.');
+            return redirect()->back();
+        }
 
-        // Buka file zip untuk ditulis
-        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
-            foreach ($overtimesToExport as $overtime) {
-                // Generate nama file PDF individual
-                $pdfFileName = 'lembur_'
-                    . str_replace(' ', '_', $overtime->user->name ?? 'user') . '_'
-                    . ($overtime->tanggal_lembur ? $overtime->tanggal_lembur->format('Ymd') : 'nodate')
-                    . '_' . $overtime->id // Tambahkan ID agar unik
-                    . '.pdf';
-
-                // Generate konten PDF (gunakan view template yang sama)
-                try {
-                    $pdf = Pdf::loadView('overtimes.pdf_template', ['cuti' => $overtime]); // Kirim sbg var 'cuti' jika template sama
-                    // Atau jika nama variabel di template pdf lembur adalah 'overtime':
-                    // $pdf = Pdf::loadView('overtimes.pdf_template', compact('overtime'));
-
-                    // Tambahkan PDF ke ZIP sebagai string
-                    $zip->addFromString($pdfFileName, $pdf->output());
-                } catch (\Exception $e) {
-                    Log::error("Failed to generate PDF for Overtime ID {$overtime->id} during bulk export: " . $e->getMessage());
-                    // Lewati file ini jika gagal generate
-                }
-            }
-
-            // Tutup arsip ZIP setelah semua PDF ditambahkan
-            $zip->close();
-
-            // Jika ZIP berhasil dibuat, kirim sebagai download dan hapus file sementara
-            if (file_exists($zipPath)) {
-                return response()->download($zipPath)->deleteFileAfterSend(true);
-            } else {
-                Alert::error('Gagal Membuat ZIP', 'File ZIP tidak dapat dibuat.');
-                return redirect()->back();
-            }
-        } else {
+        // Buka file zip
+        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
+            Log::error("Cannot open ZIP file for writing: " . $zipPath);
             Alert::error('Gagal Membuka ZIP', 'Tidak dapat membuka file ZIP untuk ditulis.');
             return redirect()->back();
         }
+
+        $pdfGenerationErrors = 0;
+        foreach ($overtimesToExport as $overtime) {
+            // --- Format Nama File PDF Baru (di dalam loop) ---
+            $tanggalLemburFormatted = $overtime->tanggal_lembur ? $overtime->tanggal_lembur->format('dmy') : 'nodate';
+            // Ganti spasi di nama user dengan underscore, buat lowercase (opsional)
+            $namaPengajuFormatted = Str::slug($overtime->user->name ?? 'user', '_');
+
+            $pdfFileName =  $tanggalLemburFormatted . '_lembur' . '_' . $namaPengajuFormatted . '.pdf';
+
+            try {
+                $pdf = Pdf::loadView('overtimes.pdf_template', compact('overtime'));
+                // Tambahkan PDF ke ZIP
+                $zip->addFromString($pdfFileName, $pdf->output());
+            } catch (\Exception $e) {
+                $pdfGenerationErrors++;
+                Log::error("Failed PDF generation (Overtime ID {$overtime->id}) in bulk: " . $e->getMessage());
+                // Lanjutkan ke PDF berikutnya
+            }
+        }
+
+        // Tutup arsip ZIP
+        $zip->close();
+
+        // Jika tidak ada PDF yang berhasil dibuat ATAU file zip tidak ada
+        if ($pdfGenerationErrors === $overtimesToExport->count() || !file_exists($zipPath)) {
+            Alert::error('Gagal Membuat PDF', 'Tidak ada file PDF yang berhasil dibuat untuk dimasukkan ke dalam ZIP.');
+            if (file_exists($zipPath)) unlink($zipPath); // Hapus file zip kosong jika terbuat
+            return redirect()->back();
+        }
+
+        // Kirim ZIP untuk download dan hapus file sementara
+        return response()->download($zipPath)->deleteFileAfterSend(true);
         // --- Akhir Proses Pembuatan ZIP ---
+    }
+
+    private function checkOverlap(int $userId, Carbon $startDate, Carbon $endDate, ?int $excludeOvertimeId = null): bool
+    {
+        // Untuk lembur, kita hanya perlu cek apakah ada lembur lain di tanggal yang sama
+        // Atau mungkin cek overlap jam? Untuk simpel, cek tanggal dulu.
+        $query = Overtime::where('user_id', $userId)
+            ->where('tanggal_lembur', $startDate->toDateString()) // Cek di tanggal yg sama
+            ->whereIn('status', ['pending', 'pending_manager_approval', 'approved']); // Cek status yg relevan
+
+        if ($excludeOvertimeId) {
+            $query->where('id', '!=', $excludeOvertimeId);
+        }
+
+        return $query->exists(); // Cukup cek apakah ada record lain di tanggal itu
     }
 } // End Class OvertimeController

@@ -9,6 +9,8 @@ use App\Policies\CutiPolicy;         // <-- Import CutiPolicy
 use App\Models\PerjalananDinas;      // <-- Import model PerjalananDinas
 use App\Policies\PerjalananDinasPolicy; // <-- Import PerjalananDinasPolicy
 use Illuminate\Pagination\Paginator;
+use App\Models\Overtime;            // <-- Import model Overtime
+use App\Policies\OvertimePolicy;    // <-- Import OvertimePolicy
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -28,6 +30,7 @@ class AppServiceProvider extends ServiceProvider
         // Daftarkan Policy di sini
         Gate::policy(Cuti::class, CutiPolicy::class);
         Gate::policy(PerjalananDinas::class, PerjalananDinasPolicy::class);
+        Gate::policy(Overtime::class, OvertimePolicy::class);
         Paginator::useBootstrapFive();
 
         // Daftarkan policy lain jika ada
