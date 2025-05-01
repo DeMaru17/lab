@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         App\Console\Commands\GenerateCutiQuota::class,
         App\Console\Commands\GrantAnnualLeaveQuota::class,
         App\Console\Commands\RefreshAllLeaveQuotas::class,
+        App\Console\Commands\SendOverdueReminders::class,
     ])
     ->withExceptions(function (Exceptions $exceptions) {
         //

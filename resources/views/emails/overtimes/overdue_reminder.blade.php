@@ -1,10 +1,10 @@
-{{-- resources/views/emails/cuti/overdue_reminder.blade.php --}}
+{{-- resources/views/emails/overtimes/overdue_reminder.blade.php --}}
 @component('mail::message')
-    # Pengingat Persetujuan Cuti
+    # Pengingat Persetujuan Lembur
 
     Yth. Bapak/Ibu {{ $approverName }},
 
-    Berikut adalah daftar pengajuan cuti yang telah menunggu persetujuan Anda selama 7 hari atau lebih:
+    Berikut adalah daftar pengajuan lembur yang telah menunggu persetujuan Anda selama 7 hari atau lebih:
 
     {{-- Gunakan Tabel HTML Biasa --}}
     <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; border: 1px solid #ddd;">
@@ -12,17 +12,17 @@
             <tr style="background-color: #f8f8f8;">
                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Tgl Pengajuan</th>
                 <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Nama Pengaju</th>
-                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Jenis Cuti</th>
-                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Tanggal Cuti</th>
-                <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Lama (Hari Kerja)</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Tanggal Lembur</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Jam Lembur</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Durasi</th>
                 <th style="border: 1px solid #ddd; padding: 8px; text-align: center;">Lama Overdue</th>
             </tr>
         </thead>
         <tbody>
             @forelse ($requests as $request)
-                {{-- $requests berisi collection Cuti --}}
+                {{-- Gunakan forelse untuk handle jika kosong --}}
                 @php
-                    // Hitung lama overdue
+                    // Hitung lama overdue (sama seperti sebelumnya)
                     $pendingSince = null;
                     if ($request->status == 'pending' && $request->created_at) {
                         $pendingSince = $request->created_at;
@@ -31,7 +31,6 @@
                     }
                     $daysOverdue = 'N/A';
                     if ($pendingSince) {
-                        // Gunakan floor(floatDiffInDays()) untuk memastikan integer
                         $daysOverdue = floor($pendingSince->floatDiffInDays(now()));
                     }
                 @endphp
@@ -39,30 +38,35 @@
                     <td style="border: 1px solid #ddd; padding: 8px;">
                         {{ $request->created_at ? $request->created_at->format('d/m/Y') : '-' }}</td>
                     <td style="border: 1px solid #ddd; padding: 8px;">{{ $request->user->name ?? 'N/A' }}</td>
-                    {{-- Pastikan relasi jenisCuti dimuat oleh command --}}
-                    <td style="border: 1px solid #ddd; padding: 8px;">{{ $request->jenisCuti->nama_cuti ?? 'N/A' }}</td>
                     <td style="border: 1px solid #ddd; padding: 8px;">
-                        {{ $request->mulai_cuti ? $request->mulai_cuti->format('d/m/Y') : '-' }} -
-                        {{ $request->selesai_cuti ? $request->selesai_cuti->format('d/m/Y') : '-' }}</td>
-                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{{ $request->lama_cuti ?? '-' }}
-                    </td> {{-- lama_cuti sudah hari kerja --}}
+                        {{ $request->tanggal_lembur ? $request->tanggal_lembur->format('d/m/Y') : '-' }}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">
+                        {{ $request->jam_mulai ? $request->jam_mulai->format('H:i') : '-' }} -
+                        {{ $request->jam_selesai ? $request->jam_selesai->format('H:i') : '-' }}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">
+                        @if (!is_null($request->durasi_menit))
+                            {{ floor($request->durasi_menit / 60) }}j {{ $request->durasi_menit % 60 }}m
+                        @else
+                            -
+                        @endif
+                    </td>
                     <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">{{ $daysOverdue }} hari</td>
                 </tr>
             @empty
                 <tr>
                     <td colspan="6"
                         style="border: 1px solid #ddd; padding: 8px; text-align: center; font-style: italic;">Tidak ada
-                        pengajuan cuti overdue saat ini.</td>
+                        pengajuan lembur overdue saat ini.</td>
                 </tr>
             @endforelse
         </tbody>
     </table>
     {{-- Akhir Tabel HTML --}}
 
-    Mohon untuk segera meninjau dan memproses pengajuan cuti tersebut melalui tautan di bawah ini:
+    Mohon untuk segera meninjau dan memproses pengajuan lembur tersebut melalui tautan di bawah ini:
 
     @component('mail::button', ['url' => $approvalUrl, 'color' => 'primary'])
-        Lihat Pengajuan Cuti
+        Lihat Pengajuan Lembur
     @endcomponent
 
     Terima kasih atas perhatian dan kerjasamanya.

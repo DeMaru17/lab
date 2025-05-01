@@ -18,4 +18,4 @@ Schedule::command('leave:grant-annual')->dailyAt('01:00');
 // -----------------------------------------
 Schedule::command('leave:refresh-all-quotas')->yearlyOn(1, 1, '02:00');
 
-Schedule::command('leave:send-overdue-reminders')->dailyAt('08:00');
+Schedule::command('reminders:send-overdue')->dailyAt('08:00');
