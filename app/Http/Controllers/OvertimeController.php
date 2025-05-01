@@ -645,7 +645,7 @@ class OvertimeController extends Controller
         ]);
         // --- Akhir Eager load ---
 
-        $tanggalLemburFormatted = $overtime->tanggal_lembur ? $overtime->tanggal_lembur->format('dmy') : 'nodate';
+        $tanggalLemburFormatted = $overtime->tanggal_lembur ? $overtime->tanggal_lembur->format('dmY') : 'nodate';
         // Ganti spasi di nama user dengan underscore, buat lowercase (opsional)
         $namaPengajuFormatted = Str::slug($overtime->user->name ?? 'user', '_');
 
@@ -720,11 +720,11 @@ class OvertimeController extends Controller
         $pdfGenerationErrors = 0;
         foreach ($overtimesToExport as $overtime) {
             // --- Format Nama File PDF Baru (di dalam loop) ---
-            $tanggalLemburFormatted = $overtime->tanggal_lembur ? $overtime->tanggal_lembur->format('dmy') : 'nodate';
+            $tanggalLemburFormatted = $overtime->tanggal_lembur ? $overtime->tanggal_lembur->format('dmy_His') : 'nodate';
             // Ganti spasi di nama user dengan underscore, buat lowercase (opsional)
             $namaPengajuFormatted = Str::slug($overtime->user->name ?? 'user', '_');
 
-            $pdfFileName =  $tanggalLemburFormatted . '_lembur' . '_' . $namaPengajuFormatted . '.pdf';
+            $pdfFileName =  $tanggalLemburFormatted . '_lembur' . '_' . $namaPengajuFormatted . $overtime->id . '.pdf';
 
             try {
                 $pdf = Pdf::loadView('overtimes.pdf_template', compact('overtime'));
