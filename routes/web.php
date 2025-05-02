@@ -10,6 +10,8 @@ use App\Http\Controllers\CutiController;
 use App\Http\Controllers\VendorController;
 use App\Http\Controllers\OvertimeController;
 use App\Http\Controllers\OvertimeRecapController;
+use App\Http\Controllers\HolidayController;
+use App\Http\Controllers\ProfileController;
 
 /*
 |--------------------------------------------------------------------------
@@ -18,7 +20,9 @@ use App\Http\Controllers\OvertimeRecapController;
 */
 
 // == Public Routes ==
-Route::get('/', function () { return view('auth.login'); });
+Route::get('/', function () {
+    return view('auth.login');
+});
 Route::get('login', [LoginController::class, 'index'])->name('login');
 Route::post('action-login', [LoginController::class, 'actionLogin'])->name('action-login');
 
@@ -32,21 +36,26 @@ Route::middleware('auth')->group(function () {
     // Dashboard (Bisa diakses semua user terotentikasi)
     Route::resource('dashboard', DashboardController::class)->only(['index']);
 
+    Route::prefix('profile')->name('profile.')->group(function() {
+        Route::get('/', [ProfileController::class, 'edit'])->name('edit'); // Menampilkan form edit profil
+        Route::match(['put', 'patch'], '/', [ProfileController::class, 'update'])->name('update'); // Menyimpan perubahan profil
+    });
+
     // Perjalanan Dinas (Akses detail diatur Policy)
     Route::resource('perjalanan-dinas', PerjalananDinasController::class)
-           ->parameters(['perjalanan-dinas' => 'perjalananDina']);
+        ->parameters(['perjalanan-dinas' => 'perjalananDina']);
 
     // Cuti Quota (Index bisa dilihat semua, Update hanya Admin)
     Route::prefix('cuti-quota')->name('cuti-quota.')->group(function () {
         Route::get('/', [CutiQuotaController::class, 'index'])->name('index');
         // Lindungi route update dengan middleware role:admin
         Route::match(['put', 'patch'], '/{id}', [CutiQuotaController::class, 'update'])
-             ->middleware('role:admin') // <-- Middleware Admin
-             ->name('update');
+            ->middleware('role:admin') // <-- Middleware Admin
+            ->name('update');
     });
 
     // Cuti (Akses detail diatur Policy)
-    Route::prefix('cuti')->name('cuti.')->group(function() {
+    Route::prefix('cuti')->name('cuti.')->group(function () {
         Route::get('/', [CutiController::class, 'index'])->name('index');
         // Lindungi create hanya untuk admin & personil (jika policy belum diterapkan)
         Route::get('/create', [CutiController::class, 'create'])->middleware('role:admin,personil')->name('create');
@@ -60,7 +69,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // Lembur (Overtime) (Akses detail diatur Policy)
-    Route::prefix('overtimes')->name('overtimes.')->group(function() {
+    Route::prefix('overtimes')->name('overtimes.')->group(function () {
         Route::get('/', [OvertimeController::class, 'index'])->name('index');
         // Lindungi create hanya untuk admin & personil
         Route::get('/create', [OvertimeController::class, 'create'])->middleware('role:admin,personil')->name('create');
@@ -82,13 +91,14 @@ Route::middleware('auth')->group(function () {
         Route::resource('personil', UserController::class);
         // Manajemen Vendor
         Route::resource('vendors', VendorController::class);
-        // Mungkin ada route admin lain di sini
+
+        Route::resource('holidays', HolidayController::class);
     });
     // --- AKHIR GRUP ADMIN ---
 
 
     // --- GRUP KHUSUS MANAJEMEN ---
-    Route::middleware(['role:manajemen'])->group(function() {
+    Route::middleware(['role:manajemen'])->group(function () {
         // Cuti Approval
         Route::prefix('cuti-approval')->name('cuti.approval.')->group(function () {
             Route::get('/asisten', [CutiController::class, 'listForAsisten'])->name('asisten.list');
@@ -112,12 +122,9 @@ Route::middleware('auth')->group(function () {
 
 
     // Rekap Lembur (Bisa diakses semua, controller/policy atur detail)
-    Route::prefix('overtime-recap')->name('overtimes.recap.')->group(function() {
+    Route::prefix('overtime-recap')->name('overtimes.recap.')->group(function () {
         Route::get('/', [OvertimeRecapController::class, 'index'])->name('index');
         // Lindungi export hanya untuk admin/manajemen?
         Route::get('/export', [OvertimeRecapController::class, 'export'])->middleware('role:admin,manajemen')->name('export');
     });
-
-
 }); // Akhir middleware 'auth' group
-

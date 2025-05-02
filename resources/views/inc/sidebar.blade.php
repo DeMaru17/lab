@@ -208,6 +208,20 @@
                     </a>
                 </li>
 
+                <li class="sidebar-item {{ Route::is('Holidays.*') ? 'active' : '' }}">
+                    <a href="{{ route('holidays.index') }}" class='sidebar-link'>
+                        <i class="bi bi-calendar-x"></i>
+                        <span>Hari Libur</span>
+                    </a>
+                </li>
+
+                <li class="sidebar-item {{ request()->routeIs('profile.*') ? 'active' : '' }}">
+                    <a href="{{ route('profile.edit') }}" class='sidebar-link'>
+                        <i class="bi bi-person-circle"></i>
+                        <span>Profil Saya</span>
+                    </a>
+                </li>
+
 
 
 

@@ -18,6 +18,8 @@ use RealRashid\SweetAlert\Facades\Alert;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Auth\Access\AuthorizationException; // Import untuk catch
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Mail\LeaveStatusNotificationMail;
+use Illuminate\Support\Facades\Mail;
 
 class CutiController extends Controller
 {
@@ -326,7 +328,7 @@ class CutiController extends Controller
             $cuti->approved_at_asisten = now();
             $cuti->status = 'pending_manager_approval';
             $cuti->save();
-            Alert::success('Berhasil', 'Pengajuan cuti disetujui (L1)...');
+            Alert::success('Berhasil', 'Pengajuan cuti disetujui');
         } catch (\Exception $e) {
             Log::error("Error approving L1 cuti ID {$cuti->id}: " . $e->getMessage());
             Alert::error('Gagal', 'Gagal memproses persetujuan L1.');
@@ -360,6 +362,7 @@ class CutiController extends Controller
     {
         // Gunakan policy untuk cek hak akses approveManager
         $this->authorize('approveManager', $cuti);
+        $approver = Auth::user();
 
         DB::beginTransaction();
         try {
@@ -389,6 +392,22 @@ class CutiController extends Controller
             $cuti->save();
 
             DB::commit();
+
+            // --- KIRIM EMAIL NOTIFIKASI APPROVAL ---
+            try {
+                // Pastikan relasi user sudah di-load atau load di sini jika perlu
+                $pengaju = $cuti->user()->first(); // Ambil objek user pengaju
+                if ($pengaju && $pengaju->email) {
+                    Mail::to($pengaju->email)->queue(new LeaveStatusNotificationMail($cuti, 'approved', $approver));
+                    Log::info("Leave approval notification sent to {$pengaju->email} for Cuti ID {$cuti->id}");
+                } else {
+                    Log::warning("Cannot send leave approval notification: User or email not found for Cuti ID {$cuti->id}");
+                }
+            } catch (\Exception $e) {
+                Log::error("Failed to send leave approval email for Cuti ID {$cuti->id}: " . $e->getMessage());
+                // Jangan gagalkan proses utama hanya karena email gagal
+            }
+            // --- AKHIR KIRIM EMAIL ---
             Alert::success('Berhasil', 'Pengajuan cuti untuk ' . $cuti->user->name . ' telah disetujui.');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -405,6 +424,7 @@ class CutiController extends Controller
     {
         // Gunakan policy untuk cek hak akses reject
         $this->authorize('reject', $cuti);
+        $rejecter = Auth::user();
 
         $validated = $request->validate(['notes' => 'required|string|max:500']);
 
@@ -419,6 +439,21 @@ class CutiController extends Controller
                 $cuti->approved_at_asisten = null;
             }
             $cuti->save();
+            // --- KIRIM EMAIL NOTIFIKASI APPROVAL ---
+            try {
+                // Pastikan relasi user sudah di-load atau load di sini jika perlu
+                $pengaju = $cuti->user()->first(); // Ambil objek user pengaju
+                if ($pengaju && $pengaju->email) {
+                    Mail::to($pengaju->email)->queue(new LeaveStatusNotificationMail($cuti, 'rejected', $rejecter));
+                    Log::info("Leave rejection notification sent to {$pengaju->email} for Cuti ID {$cuti->id}");
+                } else {
+                    Log::warning("Cannot send leave rejection notification: User or email not found for Cuti ID {$cuti->id}");
+                }
+            } catch (\Exception $e) {
+                Log::error("Failed to send leave rejection email for Cuti ID {$cuti->id}: " . $e->getMessage());
+                // Jangan gagalkan proses utama hanya karena email gagal
+            }
+            // --- AKHIR KIRIM EMAIL ---
             Alert::success('Berhasil', 'Pengajuan cuti telah ditolak.');
         } catch (\Exception $e) {
             Log::error("Error rejecting cuti ID {$cuti->id}: " . $e->getMessage());

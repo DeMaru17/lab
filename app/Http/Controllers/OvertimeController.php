@@ -16,6 +16,10 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests; // Siapkan untuk Polic
 use Barryvdh\DomPDF\Facade\Pdf; // <-- Import PDF Facade
 use ZipArchive;
 use Illuminate\Support\Str;
+use App\Mail\OvertimeStatusNotificationMail; // Import mail class
+use Illuminate\Support\Facades\Mail; // Import Mail facade
+use App\Mail\BulkOvertimeStatusNotificationMail; // Import mail class
+
 
 class OvertimeController extends Controller
 {
@@ -428,6 +432,7 @@ class OvertimeController extends Controller
     {
         // Otorisasi menggunakan Policy (contoh)
         $this->authorize('approveManager', $overtime);
+        $approver = Auth::user();
 
         DB::beginTransaction(); // Lembur tidak ubah kuota, tapi transaksi tetap baik
         try {
@@ -439,6 +444,20 @@ class OvertimeController extends Controller
             $overtime->notes = null;
             $overtime->save();
             DB::commit();
+
+            // --- KIRIM EMAIL NOTIFIKASI APPROVAL ---
+            try {
+                $pengaju = $overtime->user()->first();
+                if ($pengaju && $pengaju->email) {
+                    Mail::to($pengaju->email)->queue(new OvertimeStatusNotificationMail($overtime, 'approved', $approver));
+                    Log::info("Overtime approval notification sent to {$pengaju->email} for Overtime ID {$overtime->id}");
+                } else {
+                    Log::warning("Cannot send overtime approval notification: User or email not found for Overtime ID {$overtime->id}");
+                }
+            } catch (\Exception $e) {
+                Log::error("Failed to send overtime approval email for Overtime ID {$overtime->id}: " . $e->getMessage());
+            }
+            // --- AKHIR KIRIM EMAIL ---
             Alert::success('Berhasil', 'Pengajuan lembur ... telah disetujui.');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -455,6 +474,7 @@ class OvertimeController extends Controller
     {
         // Otorisasi menggunakan Policy (contoh)
         $this->authorize('reject', $overtime);
+        $rejecter = Auth::user();
 
         $validated = $request->validate(['notes' => 'required|string|max:500']);
 
@@ -468,6 +488,21 @@ class OvertimeController extends Controller
                 $overtime->approved_at_asisten = null;
             }
             $overtime->save();
+            // --- KIRIM EMAIL NOTIFIKASI REJECTION ---
+            // 2. Kode ini dijalankan SETELAH save() berhasil
+            try {
+                $pengaju = $overtime->user()->first();
+                if ($pengaju && $pengaju->email) {
+                    // Mengirim Mailable dengan status 'rejected' dan data $rejecter
+                    Mail::to($pengaju->email)->queue(new OvertimeStatusNotificationMail($overtime, 'rejected', $rejecter));
+                    Log::info("Overtime rejection notification sent to {$pengaju->email} for Overtime ID {$overtime->id}");
+                } else {
+                    Log::warning("Cannot send overtime rejection notification: User or email not found for Overtime ID {$overtime->id}");
+                }
+            } catch (\Exception $e) {
+                Log::error("Failed to send overtime rejection email for Overtime ID {$overtime->id}: " . $e->getMessage());
+            }
+            // --- AKHIR KIRIM EMAIL ---
             Alert::success('Berhasil', 'Pengajuan lembur telah ditolak.');
         } catch (\Exception $e) {
             Log::error("Error rejecting Overtime ID {$overtime->id}: " . $e->getMessage());
@@ -480,23 +515,29 @@ class OvertimeController extends Controller
 
     public function bulkApprove(Request $request)
     {
-        $this->authorize('bulkApprove', Overtime::class);
+        // Cek policy umum untuk bulk approve (jika pakai policy)
+        // $this->authorize('bulkApprove', Overtime::class);
+
         // Validasi input dasar
         $validated = $request->validate([
-            'selected_ids'   => 'required|array', // Pastikan array ID dikirim
-            'selected_ids.*' => 'required|integer|exists:overtimes,id', // Setiap ID harus ada di tabel overtimes
-            'approval_level' => 'required|in:asisten,manager', // Pastikan level approval valid
+            'selected_ids'   => 'required|array',
+            'selected_ids.*' => 'required|integer|exists:overtimes,id',
+            'approval_level' => 'required|in:asisten,manager',
         ]);
+
         $selectedIds = $validated['selected_ids'];
         $approvalLevel = $validated['approval_level'];
         $approver = Auth::user();
 
+
         $successCount = 0;
         $failCount = 0;
-        $failedDetails = []; // Simpan detail kegagalan
+        $emailFailCount = 0;
+        $failedDetails = [];
+        $approvedRequestsByUser = []; // <-- Array untuk kelompokkan hasil approve per user
 
-        // Ambil semua data lembur yang dipilih sekaligus
-        $overtimesToProcess = Overtime::with('user:id,name,jabatan') // Load user untuk cek jabatan
+        // Ambil data lembur yang dipilih lengkap dengan relasi user
+        $overtimesToProcess = Overtime::with(['user:id,name,jabatan,email']) // Perlu email user
             ->whereIn('id', $selectedIds)
             ->get();
 
@@ -505,75 +546,116 @@ class OvertimeController extends Controller
             foreach ($overtimesToProcess as $overtime) {
                 $canProcess = false;
                 $errorMessage = null;
+                $newStatus = null;
 
                 // Lakukan otorisasi dan validasi per item
                 if ($approvalLevel === 'asisten') {
-                    // Otorisasi Level 1
+                    // ... (Logika otorisasi & update status Asisten) ...
                     if ($overtime->status === 'pending') {
                         $pengajuJabatan = $overtime->user->jabatan;
                         if (($approver->jabatan === 'asisten manager analis' && in_array($pengajuJabatan, ['analis', 'admin'])) ||
                             ($approver->jabatan === 'asisten manager preparator' && in_array($pengajuJabatan, ['preparator', 'mekanik', 'admin']))
                         ) {
                             $canProcess = true;
+                            $newStatus = 'pending_manager_approval';
                         } else {
-                            $errorMessage = "Tidak berwenang untuk jabatan pengaju.";
+                            $errorMessage = "Tidak berwenang.";
                         }
                     } else {
                         $errorMessage = "Status bukan 'pending'.";
                     }
 
-                    // Jika lolos, update ke pending L2
                     if ($canProcess) {
                         $overtime->approved_by_asisten_id = $approver->id;
                         $overtime->approved_at_asisten = now();
-                        $overtime->status = 'pending_manager_approval';
+                        $overtime->status = $newStatus;
                         $overtime->save();
                         $successCount++;
+                        // Tidak ada email di L1
                     }
                 } elseif ($approvalLevel === 'manager') {
-                    // Otorisasi Level 2
+                    // ... (Logika otorisasi Manager) ...
                     if ($approver->jabatan === 'manager' && $overtime->status === 'pending_manager_approval') {
                         $canProcess = true;
+                        $newStatus = 'approved';
                     } else if ($approver->jabatan !== 'manager') {
-                        $errorMessage = "Hanya Manager yang bisa approve L2.";
+                        $errorMessage = "Hanya Manager.";
                     } else {
                         $errorMessage = "Status bukan 'pending_manager_approval'.";
                     }
 
-                    // Jika lolos, update ke approved
                     if ($canProcess) {
+                        // ... (Update status & data approval Manager) ...
                         $overtime->approved_by_manager_id = $approver->id;
                         $overtime->approved_at_manager = now();
-                        $overtime->status = 'approved';
-                        $overtime->rejected_by_id = null; // Reset reject jika ada
+                        $overtime->status = $newStatus;
+                        $overtime->rejected_by_id = null;
                         $overtime->rejected_at = null;
                         $overtime->notes = null;
                         $overtime->save();
                         $successCount++;
+
+                        // --- KUMPULKAN UNTUK EMAIL BULK ---
+                        $pengaju = $overtime->user;
+                        if ($pengaju) {
+                            // Gunakan user_id sebagai key
+                            $approvedRequestsByUser[$pengaju->id]['user'] = $pengaju; // Simpan objek user
+                            $approvedRequestsByUser[$pengaju->id]['requests'][] = $overtime; // Tambahkan overtime ke list
+                        }
+                        // --- AKHIR KUMPULKAN ---
                     }
                 }
 
-                // Catat jika gagal
+                // Catat jika gagal proses approval/validasi item ini
                 if (!$canProcess) {
                     $failCount++;
-                    $failedDetails[] = "ID {$overtime->id} ({$overtime->user->name}): " . ($errorMessage ?? 'Gagal otorisasi/validasi.');
-                    Log::warning("Bulk Approve Overtime Failed: ID {$overtime->id}. Reason: " . ($errorMessage ?? 'Authorization/Validation failed') . ". Approver: {$approver->id}");
+                    $failedDetails[] = "ID {$overtime->id} ({$overtime->user->name}): " . ($errorMessage ?? 'Gagal.');
+                    Log::warning("Bulk Approve Overtime Failed: ID {$overtime->id}. Reason: " . ($errorMessage ?? 'Failed') . ". Approver: {$approver->id}");
                 }
             } // End foreach
 
-            DB::commit(); // Simpan semua perubahan jika tidak ada error fatal
+            DB::commit(); // Simpan semua perubahan DB
 
-            // Siapkan notifikasi
+            // --- KIRIM EMAIL RINGKASAN SETELAH COMMIT ---
+            if ($approvalLevel === 'manager' && !empty($approvedRequestsByUser)) {
+                Log::info("Mengirim email notifikasi ringkasan...");
+                foreach ($approvedRequestsByUser as $userId => $userData) {
+                    $pengajuUser = $userData['user'];
+                    $approvedList = collect($userData['requests']); // Jadikan collection
+
+                    if ($pengajuUser && $pengajuUser->email && $approvedList->isNotEmpty()) {
+                        try {
+                            // Gunakan Mailable baru
+                            Mail::to($pengajuUser->email)->queue(new BulkOvertimeStatusNotificationMail($approvedList, $approver, $pengajuUser));
+                            Log::info("Bulk Overtime approval notification queued for {$pengajuUser->email} for " . $approvedList->count() . " requests.");
+                        } catch (\Exception $e) {
+                            $emailFailCount++;
+                            Log::error("Failed to queue bulk overtime approval email for User ID {$userId}: " . $e->getMessage());
+                        }
+                    } else {
+                        Log::warning("Skipping bulk email for User ID {$userId} due to missing user/email/requests.");
+                        if ($approvedList->isNotEmpty()) $emailFailCount += $approvedList->count(); // Hitung sbg gagal jika ada request
+                    }
+                }
+            }
+            // --- AKHIR KIRIM EMAIL RINGKASAN ---
+
+
+            // Siapkan notifikasi SweetAlert (tetap sama)
+            $successMessage = "{$successCount} pengajuan berhasil diproses.";
             if ($failCount > 0) {
                 $errorList = implode("\n", $failedDetails);
-                Alert::success('Proses Selesai', "{$successCount} pengajuan berhasil disetujui.")
-                    ->persistent(true) // Tampilkan lebih lama
+                Alert::success('Proses Selesai', $successMessage)
+                    ->persistent(true)
                     ->warning('Gagal Memproses', "{$failCount} pengajuan gagal diproses:\n" . $errorList);
             } else {
-                Alert::success('Berhasil', "{$successCount} pengajuan lembur berhasil disetujui.");
+                Alert::success('Berhasil', $successMessage);
+            }
+            if ($emailFailCount > 0) {
+                Alert::info('Info Tambahan', "{$emailFailCount} notifikasi email gagal dikirim/diantrikan. Silakan cek log.");
             }
         } catch (\Exception $e) {
-            DB::rollBack(); // Batalkan semua jika ada error
+            DB::rollBack();
             Log::error("Error during bulk approve overtime: " . $e->getMessage());
             Alert::error('Gagal Total', 'Terjadi kesalahan sistem saat memproses persetujuan massal.');
         }
