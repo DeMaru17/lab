@@ -1,374 +1,285 @@
 {{-- resources/views/overtimes/pdf_template.blade.php --}}
-<!DOCTYPE html>
-<html lang="id">
+@php
+    use Carbon\Carbon;
+    use Illuminate\Support\Str;
+
+    // Helper function to format duration (optional, bisa juga di model/controller)
+    if (!function_exists('formatDuration')) {
+        function formatDuration($totalMinutes)
+        {
+            if (is_null($totalMinutes) || $totalMinutes < 0) {
+                return '-';
+            }
+            $hours = floor($totalMinutes / 60);
+            $minutes = $totalMinutes % 60;
+            return sprintf('%d Jam %02d Menit', $hours, $minutes);
+        }
+    }
+@endphp
+<html>
 
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>Formulir Pengajuan Lembur - {{ $overtime->user->name ?? 'Karyawan' }}</title>
-    {{-- Salin CSS dari template PDF Cuti Anda, sesuaikan jika perlu --}}
+    <title>Surat Perintah Kerja Lembur - {{ $overtime->user->name ?? 'Karyawan' }}</title>
     <style type="text/css">
-        body {
+        /* CSS Anda di sini (Disalin dari template Anda) */
+        div {
             font-family: Tahoma, DejaVu Sans, sans-serif;
-            font-size: 10pt;
-            line-height: 1.3;
-        }
-
-        @page {
-            margin: 1cm 1.5cm;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 15px;
-        }
-
-        .header .company-name {
-            font-size: 14pt;
-            font-weight: bold;
-        }
-
-        .header .form-title {
-            font-size: 12pt;
-            font-weight: bold;
-            text-decoration: underline;
-            margin-top: 5px;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
+            margin-top: -1px;
+            font-family: Tahoma;
         }
 
-        .main-layout-table td {
+        td {
+            padding-left: 5px;
+            font-size: 10pt;
             vertical-align: top;
-            padding: 0;
         }
 
-        .main-layout-table .left-column {
-            width: 55%;
-            padding-right: 10px;
+        /* Default font size & v-align */
+        .title {
+            padding-left: 50px;
+            font-weight: bold;
+            font-size: 11pt;
         }
 
-        .main-layout-table .right-column {
-            width: 45%;
-            padding-left: 10px;
+        /* Sesuaikan size */
+        img.logo {
+            max-height: 45px;
+            height: auto;
+            padding-right: 5px;
+            float: right;
         }
 
-        .detail-table {
-            width: 100%;
-            margin-bottom: 5px;
+        /* Gunakan max-height & float */
+        .center {
+            text-align: center;
         }
 
-        .detail-table td {
-            padding: 1px 0;
+        table.bordered {
+            border: 2px solid #000;
         }
 
-        .detail-table td.label {
-            width: 35%;
+        table.bordered td,
+        table.bordered th {
+            border: 1px solid #000;
         }
 
-        .detail-table td.separator {
+        /* Tambahkan border untuk sel ttd jika perlu */
+        .jamlembur {
+            width: 60px;
+            text-align: center;
+        }
+
+        /* Lebarkan sedikit & center */
+        .ttd-cell {
+            width: 25%;
+            height: 50px;
+            vertical-align: middle;
+            text-align: center;
+        }
+
+        /* Cell untuk TTD */
+        .ttd-cell img {
+            max-height: 45px;
+            height: auto;
+        }
+
+        /* Ukuran gambar TTD */
+        .name-row td {
+            text-align: center;
+            font-size: 10pt;
+            padding-top: 2px;
+        }
+
+        .jabatan-row td {
+            text-align: center;
+            font-size: 9pt;
+            padding-bottom: 10px;
+        }
+
+        /* Class dari template sebelumnya (jika masih relevan) */
+        .col-left {
+            width: 15%;
+        }
+
+        /* Sesuaikan lebar jika perlu */
+        .col-mid {
             width: 2%;
             text-align: center;
         }
 
-        .detail-table td.value {
-            width: 63%;
-        }
-
-        /* Status Box (bisa disesuaikan) */
-        .status-box {
-            border: 1px solid #ccc;
-            padding: 8px;
-            margin-top: 10px;
-            background-color: #f9f9f9;
-            font-size: 9pt;
-        }
-
-        .status-box strong {
-            font-size: 1em;
-        }
-
-        .status-approved {
-            color: #28a745;
-        }
-
-        .status-rejected {
-            color: #dc3545;
-        }
-
-        .status-pending {
-            color: #ffc107;
-        }
-
-        .status-cancelled {
-            color: #6c757d;
-        }
-
-        .notes {
-            font-style: italic;
-            color: #555;
-        }
-
-        /* Approval Section */
-        .approval-header {
-            font-size: 12pt;
-            text-align: center;
-            font-weight: bold;
-            border: 2px solid #000;
-            border-bottom: 1px solid #000;
-            padding: 5px;
-            margin-top: 20px;
-        }
-
-        .approval-section {
-            width: 100%;
-            border: 2px solid #000;
-            border-top: none;
-            margin-top: 0;
-        }
-
-        .approval-section td {
-            text-align: center;
-            vertical-align: top;
-            height: 80px;
-            padding: 5px;
-        }
-
-        .approval-section .label-row td {
-            height: auto;
-            font-weight: bold;
-            font-size: 10pt;
-            padding-bottom: 2px;
-            border-bottom: 1px solid #000;
-        }
-
-        .approval-section .signature-row td {
-            height: 60px;
-            vertical-align: middle;
-        }
-
-        .approval-section .signature-row img {
-            max-height: 55px;
-            height: auto;
-        }
-
-        .approval-section .name-row td {
-            height: auto;
-            font-size: 10pt;
-            border-top: 1px solid #000;
-            padding-top: 2px;
-        }
-
-        .approval-section td:not(:last-child) {
-            border-right: 1px solid #000;
-        }
-
-        .footer-note {
-            text-align: right;
-            font-size: 8pt;
-            margin-top: 5px;
-        }
-
-        .logo {
-            max-width: 80px;
-            max-height: 40px;
-            float: right;
-        }
+        /* Hapus col-right, col-tglcuti, dll jika tidak dipakai di struktur baru */
     </style>
 </head>
 
 <body>
-    <div class="container">
-        {{-- Header Utama --}}
-        <table style="border: 2px solid #000; margin-bottom: 5px;">
-            <tr>
-                <td style="width: 80%; vertical-align: middle; font-size: 16pt; text-align: center; font-weight: bold;">
-                    FORMULIR PENGAJUAN LEMBUR</td>
-                <td style="width: 20%; text-align: right; vertical-align: middle;">
-                    {{-- Logika Logo Vendor --}}
-                    @php
-                        $logoPath = null;
-                        $defaultText = 'CSI INDONESIA';
-                        if (
-                            $overtime->user?->vendor?->logo_path &&
-                            file_exists(public_path('storage/' . $overtime->user->vendor->logo_path))
-                        ) {
-                            $logoPath = public_path('storage/' . $overtime->user->vendor->logo_path);
-                        }
-                    @endphp
-                    @if ($logoPath)
-                        <img src="{{ $logoPath }}" class="logo" alt="Logo Vendor">
-                    @else
-                        {{ $defaultText }}
-                    @endif
-                </td>
-            </tr>
-        </table>
-
-        {{-- Detail dalam Border Box --}}
-        <div
-            style="padding: 10px 10px 10px 10px; border-left: 2px solid #000; border-right: 2px solid #000; border-bottom: 2px solid #000;">
-            {{-- Informasi Karyawan --}}
-            <table class="detail-table">
-                <tr>
-                    <td class="label" style="width: 20%;">Nama</td>
-                    <td class="separator" style="width: 2%;">:</td>
-                    <td style="width: 78%;">{{ $overtime->user->name ?? '-' }}</td>
-                </tr>
-                <tr>
-                    <td class="label">Jabatan</td>
-                    <td class="separator">:</td>
-                    <td>{{ $overtime->user->jabatan ?? '-' }}</td>
-                </tr>
-                <tr>
-                    <td class="label">Unit Bisnis / Vendor</td>
-                    <td class="separator">:</td>
-                    <td>{{ $overtime->user->vendor->name ?? 'Geomin (Internal)' }}</td> {{-- Tampilkan Vendor atau default --}}
-                </tr>
-            </table>
-
-            <hr style="border-top: 1px dashed #ccc; margin: 8px 0;">
-
-            {{-- Detail Lembur --}}
-            <table class="detail-table">
-                <tr>
-                    <td class="label" style="width: 20%;">Tanggal Lembur</td>
-                    <td class="separator" style="width: 2%;">:</td>
-                    <td style="width: 78%;">
-                        {{ $overtime->tanggal_lembur ? $overtime->tanggal_lembur->format('d F Y') : '-' }}</td>
-                </tr>
-                <tr>
-                    <td class="label">Jam Mulai</td>
-                    <td class="separator">:</td>
-                    <td>{{ $overtime->jam_mulai ? $overtime->jam_mulai->format('H:i') : '-' }} WIB</td>
-                </tr>
-                <tr>
-                    <td class="label">Jam Selesai</td>
-                    <td class="separator">:</td>
-                    <td>{{ $overtime->jam_selesai ? $overtime->jam_selesai->format('H:i') : '-' }} WIB</td>
-                </tr>
-                <tr>
-                    <td class="label">Durasi Lembur</td>
-                    <td class="separator">:</td>
-                    <td>
-                        @if (!is_null($overtime->durasi_menit))
-                            {{ floor($overtime->durasi_menit / 60) }} jam {{ $overtime->durasi_menit % 60 }} menit
-                        @else
-                            -
-                        @endif
-                        ({{ $overtime->durasi_menit ?? 0 }} menit)
-                    </td>
-                </tr>
-                <tr>
-                    <td class="label">Uraian Pekerjaan</td>
-                    <td class="separator">:</td>
-                    <td>{{ $overtime->uraian_pekerjaan ?? '-' }}</td>
-                </tr>
-            </table>
-
-            {{-- Status Persetujuan --}}
-            <div class="status-box">
+    {{-- Tabel Header --}}
+    <table class="center bordered">
+        <tr>
+            <td class="title"
+                style="width: 85%; border-right: 2px solid #000; border-bottom: none; padding: 5px 0 0 50px;">
+                SURAT PERINTAH KERJA LEMBUR <br>
+                {{ $overtime->user->vendor->name ?? 'CSI INDONESIA (Internal)' }} <br> {{-- Isi Nama Vendor --}}
+                UNIT BISNIS / LOKASI : Geomin / Laboratorium Pulogadung {{-- Isi Nama Unit Bisnis / Lokasi --}}
+            </td>
+            <td style="width: 15%; border-left: none; border-bottom: none; text-align: center; vertical-align: middle;">
+                {{-- Logika Logo Vendor --}}
                 @php
-                    $statusClass = '';
-                    $statusText = Str::title(str_replace('_', ' ', $overtime->status));
-                    switch ($overtime->status) {
-                        case 'pending':
-                            $statusClass = 'status-pending';
-                            $statusText = 'Menunggu Approval Asisten';
-                            break;
-                        case 'pending_manager_approval':
-                            $statusClass = 'status-pending';
-                            $statusText = 'Menunggu Approval Manager';
-                            break;
-                        case 'approved':
-                            $statusClass = 'status-approved';
-                            break;
-                        case 'rejected':
-                            $statusClass = 'status-rejected';
-                            break;
-                        case 'cancelled':
-                            $statusClass = 'status-cancelled';
-                            $statusText = 'Dibatalkan oleh Pemohon';
-                            break;
+                    $logoPath = null;
+                    if (
+                        $overtime->user?->vendor?->logo_path &&
+                        file_exists(public_path('storage/' . $overtime->user->vendor->logo_path))
+                    ) {
+                        $logoPath = public_path('storage/' . $overtime->user->vendor->logo_path);
                     }
                 @endphp
-                Status Saat Ini: <strong class="{{ $statusClass }}">{{ $statusText }}</strong>
-                <br>
-                {{-- Detail Approval / Rejection --}}
-                @if ($overtime->approved_by_asisten_id)
-                    <span class="notes">Disetujui Level 1 oleh {{ $overtime->approverAsisten->name ?? 'N/A' }} pada
-                        {{ $overtime->approved_at_asisten ? $overtime->approved_at_asisten->format('d/m/Y H:i') : '-' }}</span><br>
+                @if ($logoPath)
+                    <img src="{{ $logoPath }}" class="logo" alt="Logo Vendor">
+                @else
+                    {{-- Tampilkan teks default atau logo default --}}
+                    {{-- CSI INDONESIA --}}
+                    &nbsp; {{-- Kosongkan jika tidak ada logo --}}
                 @endif
-                @if ($overtime->approved_by_manager_id)
-                    <span class="notes">Disetujui Level 2 oleh {{ $overtime->approverManager->name ?? 'N/A' }} pada
-                        {{ $overtime->approved_at_manager ? $overtime->approved_at_manager->format('d/m/Y H:i') : '-' }}</span><br>
+            </td>
+        </tr>
+    </table>
+
+    {{-- Tabel Detail --}}
+    <table class="bordered">
+        <tr style="height: 30px;">
+            <td colspan="3" style="border: none; padding-top: 10px;">Bersama ini menugaskan kepada:</td>
+        </tr>
+        <tr>
+            <td style="width: 15%; border: none;">Nama</td>
+            <td style="width: 2%; border: none;">:</td>
+            <td style="border: none;">{{ $overtime->user->name ?? '-' }}</td> {{-- Isi Nama --}}
+        </tr>
+        <tr>
+            <td style="border: none;">NIP</td>
+            <td style="border: none;">:</td>
+            <td style="border: none;">-</td> {{-- Isi NIP (Kosong) --}}
+        </tr>
+        <tr>
+            <td style="border: none;">Jabatan</td>
+            <td style="border: none;">:</td>
+            <td style="border: none;">{{ $overtime->user->jabatan ?? '-' }}</td> {{-- Isi Jabatan --}}
+        </tr>
+        <tr>
+            <td style="border: none;">Hari/Tanggal</td>
+            <td style="border: none;">:</td>
+            {{-- Format Hari, Tanggal Bulan Tahun --}}
+            <td style="border: none;">
+                {{ $overtime->tanggal_lembur ? $overtime->tanggal_lembur->locale('id_ID')->isoFormat('dddd, D MMMM YYYY') : '-' }}
+            </td>
+        </tr>
+        <tr style="height: 30px;">
+            <td colspan="3" style="border: none;">Untuk melaksanakan lembur pada:</td>
+        </tr>
+        <tr>
+            {{-- Tabel Lembur Nested --}}
+            <td colspan="3" style="border: none; padding-left: 50px; padding-right: 50px;"> {{-- Beri padding agar tidak terlalu lebar --}}
+                <table class="center bordered">
+                    <thead>
+                        <tr>
+                            <th colspan="3">Jam Lembur</th>
+                            <th rowspan="2" style="vertical-align: middle;">Uraian Pekerjaan</th>
+                        </tr>
+                        <tr>
+                            <th class="jamlembur">Mulai</th>
+                            <th class="jamlembur">Selesai</th>
+                            <th class="jamlembur">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="height: 50px;"> {{-- Beri tinggi agar uraian muat --}}
+                            <td class="jamlembur">{{ $overtime->jam_mulai ? $overtime->jam_mulai->format('H:i') : '-' }}
+                            </td> {{-- Isi Mulai Lembur --}}
+                            <td class="jamlembur">
+                                {{ $overtime->jam_selesai ? $overtime->jam_selesai->format('H:i') : '-' }}</td>
+                            {{-- Isi Selesai Lembur --}}
+                            <td class="jamlembur">{{ formatDuration($overtime->durasi_menit) }}</td>
+                            {{-- Isi Total Lembur --}}
+                            <td style="text-align: left;">{{ $overtime->uraian_pekerjaan ?? '-' }}</td>
+                            {{-- Isi Uraian Pekerjaan --}}
+                        </tr>
+                    </tbody>
+                </table>
+            </td>
+        </tr>
+        <tr style="height: 30px;">
+            <td colspan="3" style="border: none;">Demikian surat perintah ini dibuat untuk keperluan sebagaimana
+                mestinya.</td>
+        </tr>
+    </table>
+
+    {{-- Tabel Tanda Tangan --}}
+    <table style="border: 2px solid #000; border-collapse: collapse;">
+        <tr>
+            <td style="padding-top: 10px; border: none;" colspan="2">Pulo Gadung,
+                {{ now()->isoFormat('D MMMM YYYY') }}</td> {{-- Isi Tanggal Hari Ini --}}
+            <td style="border: none;" colspan="2"></td>
+        </tr>
+        <tr style="border-bottom: 1px solid #000;">
+            <td style="border: none; text-align: center; padding-bottom: 5px;">Dibuat Oleh,</td>
+            <td style="border: none; text-align: center; padding-bottom: 5px;">Diperiksa Oleh,</td>
+            <td style="border: none; text-align: center; padding-bottom: 5px;" colspan="2">Diketahui Oleh,</td>
+        </tr>
+        <tr>
+            <td class="ttd-cell"> {{-- TTD Pemohon --}}
+                @if (
+                    $overtime->user &&
+                        $overtime->user->signature_path &&
+                        file_exists(public_path('storage/' . $overtime->user->signature_path)))
+                    <img src="{{ public_path('storage/' . $overtime->user->signature_path) }}" alt="TTD Pemohon">
                 @endif
-                @if ($overtime->rejected_by_id)
-                    <span class="notes">Ditolak oleh {{ $overtime->rejecter->name ?? 'N/A' }} pada
-                        {{ $overtime->rejected_at ? $overtime->rejected_at->format('d/m/Y H:i') : '-' }}</span><br>
-                    <span class="notes">Alasan: {{ $overtime->notes ?? '-' }}</span><br>
+            </td>
+            <td class="ttd-cell"> {{-- TTD Pemeriksa (Kosong) --}}
+            </td>
+            <td class="ttd-cell"> {{-- TTD Asisten Manager --}}
+                @if (
+                    $overtime->approved_by_asisten_id &&
+                        $overtime->approverAsisten &&
+                        $overtime->approverAsisten->signature_path &&
+                        file_exists(public_path('storage/' . $overtime->approverAsisten->signature_path)))
+                    <img src="{{ public_path('storage/' . $overtime->approverAsisten->signature_path) }}"
+                        alt="TTD Asisten">
                 @endif
-            </div>
-
-        </div> {{-- End Border Box --}}
-
-        {{-- Kolom Persetujuan Header --}}
-        <div class="approval-header">KOLOM PERSETUJUAN</div>
-
-        {{-- Bagian Tanda Tangan --}}
-        <table class="approval-section">
-            {{-- Baris Label TTD --}}
-            <tr class="col-ttd label-row">
-                <td class="col-33">PEMOHON</td>
-                <td class="col-33">ATASAN BERIKUTNYA</td> {{-- Asisten Manager --}}
-                <td class="col-33">USER ANTAM</td> {{-- Manager --}}
-            </tr>
-            {{-- Baris Gambar TTD --}}
-            <tr class="signature-row">
-                <td class="ttd-area">
-                    @if (
-                        $overtime->user &&
-                            $overtime->user->signature_path &&
-                            file_exists(public_path('storage/' . $overtime->user->signature_path)))
-                        <img src="{{ public_path('storage/' . $overtime->user->signature_path) }}" alt="TTD Pemohon">
-                    @endif
-                </td>
-                <td class="ttd-area">
-                    @if (
-                        $overtime->approved_by_asisten_id &&
-                            $overtime->approverAsisten &&
-                            $overtime->approverAsisten->signature_path &&
-                            file_exists(public_path('storage/' . $overtime->approverAsisten->signature_path)))
-                        <img src="{{ public_path('storage/' . $overtime->approverAsisten->signature_path) }}"
-                            alt="TTD Asisten">
-                    @endif
-                </td>
-                <td class="ttd-area">
-                    @if (
-                        $overtime->approved_by_manager_id &&
-                            $overtime->approverManager &&
-                            $overtime->approverManager->signature_path &&
-                            file_exists(public_path('storage/' . $overtime->approverManager->signature_path)))
-                        <img src="{{ public_path('storage/' . $overtime->approverManager->signature_path) }}"
-                            alt="TTD Manager">
-                    @endif
-                </td>
-            </tr>
-            {{-- Baris Nama --}}
-            <tr class="ttd-name">
-                <td>({{ $overtime->user->name ?? '....................' }})</td>
-                <td>({{ $overtime->approverAsisten->name ?? '....................' }})</td>
-                <td>({{ $overtime->approverManager->name ?? '....................' }})</td>
-            </tr>
-        </table>
-
-        {{-- Footer Note (jika perlu) --}}
-        {{-- <div class="footer-note">
-             Catatan Tambahan...
-         </div> --}}
-
-    </div> {{-- End Container --}}
+            </td>
+            <td class="ttd-cell"> {{-- TTD Manager --}}
+                @if (
+                    $overtime->approved_by_manager_id &&
+                        $overtime->approverManager &&
+                        $overtime->approverManager->signature_path &&
+                        file_exists(public_path('storage/' . $overtime->approverManager->signature_path)))
+                    <img src="{{ public_path('storage/' . $overtime->approverManager->signature_path) }}"
+                        alt="TTD Manager">
+                @endif
+            </td>
+        </tr>
+        <tr class="name-row">
+            <td>({{ $overtime->user->name ?? '....................' }})</td> {{-- Isi Nama Pemohon --}}
+            <td>(....................)</td> {{-- Isi Nama Pemeriksa (Kosong) --}}
+            <td>({{ $overtime->approverAsisten->name ?? '....................' }})</td> {{-- Isi Nama Asisten Manager --}}
+            <td>({{ $overtime->approverManager->name ?? '....................' }})</td> {{-- Isi Nama Manager --}}
+        </tr>
+        <tr class="jabatan-row">
+            <td>{{ $overtime->user->jabatan ?? '....................' }}</td> {{-- Isi Jabatan Pemohon --}}
+            <td>....................</td> {{-- Isi Jabatan Pemeriksa (Kosong) --}}
+            <td>{{ $overtime->approverAsisten->jabatan ?? 'Asisten Manager' }}</td> {{-- Isi Jabatan Asisten Manager --}}
+            <td>{{ $overtime->approverManager->jabatan ?? 'Manager' }}</td> {{-- Isi Jabatan Manager --}}
+        </tr>
+    </table>
+    <div class="footer-note">
+        <b>Note:</b>
+        <p><small>* Surat ini harus terlebih dahulu mendapatkan approval dari Pengawas Pekerjaan/User, apabila tidak
+                mendapatkan persetujuan maka pekerjaan
+                lembur dianggap tidak sah</small></p>
+    </div>
 </body>
 
 </html>
