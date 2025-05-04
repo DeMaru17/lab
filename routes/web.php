@@ -12,6 +12,7 @@ use App\Http\Controllers\OvertimeController;
 use App\Http\Controllers\OvertimeRecapController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\AttendanceController;
 
 /*
 |--------------------------------------------------------------------------
@@ -36,7 +37,7 @@ Route::middleware('auth')->group(function () {
     // Dashboard (Bisa diakses semua user terotentikasi)
     Route::resource('dashboard', DashboardController::class)->only(['index']);
 
-    Route::prefix('profile')->name('profile.')->group(function() {
+    Route::prefix('profile')->name('profile.')->group(function () {
         Route::get('/', [ProfileController::class, 'edit'])->name('edit'); // Menampilkan form edit profil
         Route::match(['put', 'patch'], '/', [ProfileController::class, 'update'])->name('update'); // Menyimpan perubahan profil
     });
@@ -127,4 +128,18 @@ Route::middleware('auth')->group(function () {
         // Lindungi export hanya untuk admin/manajemen?
         Route::get('/export', [OvertimeRecapController::class, 'export'])->middleware('role:admin,manajemen')->name('export');
     });
+
+    // === TAMBAHKAN ROUTE ABSENSI ===
+    Route::prefix('attendances')->name('attendances.')->group(function () {
+        // Halaman utama absensi (menampilkan tombol check-in/out)
+        Route::get('/', [AttendanceController::class, 'index'])->name('index');
+        // Aksi untuk menyimpan data check-in/check-out (via AJAX/Fetch)
+        Route::post('/store', [AttendanceController::class, 'store'])->name('store');
+        // Mungkin perlu route untuk riwayat absensi atau koreksi nanti
+        // Route::get('/history', [AttendanceController::class, 'history'])->name('history');
+        // Route::get('/correction/create', [AttendanceController::class, 'createCorrection'])->name('correction.create');
+        // Route::post('/correction', [AttendanceController::class, 'storeCorrection'])->name('correction.store');
+    });
+    // === AKHIR ROUTE ABSENSI ===
+
 }); // Akhir middleware 'auth' group

@@ -52,11 +52,26 @@
 
                 </li>
 
-                <li class="sidebar-item {{ Route::is('#') ? 'active' : '' }}">
-                    <a href="#" class='sidebar-link'>
-                        <i class="bi bi-person-check-fill"></i>
+                <li class="sidebar-item {{ request()->routeIs('attendances.*') ? 'active' : '' }}">
+                    {{-- Link utama ke halaman index absensi --}}
+                    <a href="{{ route('attendances.index') }}" class='sidebar-link'>
+                        <i class="bi bi-person-check-fill"></i> {{-- Ikon Absensi --}}
                         <span>Absensi</span>
                     </a>
+                    {{-- Bagian Submenu (Saat ini dikomentari/tidak aktif) --}}
+                    {{-- Jika nanti Anda butuh submenu, hapus komentar di bawah dan sesuaikan --}}
+                    <ul class="submenu {{ request()->routeIs('attendances.*') ? 'active' : '' }}">
+                        <li class="submenu-item {{ request()->routeIs('attendances.index') ? 'active' : '' }}">
+                            <a href="{{ route('attendances.index') }}" class="submenu-link">Absen Hari Ini</a>
+                        </li>
+                        <li class="submenu-item {{-- request()->routeIs('attendances.history') ? 'active' : '' --}}">
+                            <a href="#" {{-- href="{{ route('attendances.history') }}" --}} class="submenu-link">Riwayat Absensi</a>
+                        </li>
+                        <li class="submenu-item {{-- request()->routeIs('attendances.correction.create') ? 'active' : '' --}}">
+                            <a href="#" {{-- href="{{ route('attendances.correction.create') }}" --}} class="submenu-link">Ajukan Koreksi</a>
+                        </li>
+                    </ul>
+                    {{-- Akhir Bagian Submenu --}}
                 </li>
 
 
@@ -102,7 +117,8 @@
                                 class="submenu-item {{ request()->routeIs('overtimes.approval.asisten.list') ? 'active' : '' }}">
                                 {{-- Pastikan route 'overtimes.approval.asisten.list' sudah/akan didefinisikan --}}
                                 <a href="{{ route('overtimes.approval.asisten.list') }}"
-                                    class="submenu-link">Persetujuan Asisten Manager</a>
+                                    class="submenu-link">Persetujuan
+                                    Asisten Manager</a>
                             </li>
                         @endif
 
@@ -112,7 +128,8 @@
                                 class="submenu-item {{ request()->routeIs('overtimes.approval.manager.list') ? 'active' : '' }}">
                                 {{-- Pastikan route 'overtimes.approval.manager.list' sudah/akan didefinisikan --}}
                                 <a href="{{ route('overtimes.approval.manager.list') }}"
-                                    class="submenu-link">Persetujuan Manager</a>
+                                    class="submenu-link">Persetujuan
+                                    Manager</a>
                             </li>
                         @endif
 
