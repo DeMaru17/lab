@@ -70,7 +70,7 @@ class AttendanceController extends Controller
             'latitude' => ['required', 'numeric', 'regex:/^[-]?(([0-8]?[0-9])\.(\d+))|(90(\.0+)?)$/'], // Validasi format Latitude
             'longitude' => ['required', 'numeric', 'regex:/^[-]?((((1[0-7][0-9])|([0-9]?[0-9]))\.(\d+))|180(\.0+)?)$/'], // Validasi format Longitude
             'selfie_data' => 'required|string', // Base64 data URI dari gambar selfie
-            'shift_id' => 'required_if:action,check_in|exists:shifts,id', // Wajib jika check-in
+            'shift_id' => 'required_if:action,check_in|nullable|exists:shifts,id', // Wajib jika check-in
             'action' => 'required|in:check_in,check_out', // Aksi yg dilakukan
         ]);
 
@@ -84,8 +84,10 @@ class AttendanceController extends Controller
         $allowedRadius = config('attendance.allowed_radius_meters'); // <-- Ambil dari config
 
         $distance = $this->calculateDistance(
-            $validated['latitude'], $validated['longitude'],
-            $officeLat, $officeLng // <-- Gunakan variabel config
+            $validated['latitude'],
+            $validated['longitude'],
+            $officeLat,
+            $officeLng // <-- Gunakan variabel config
         );
 
         $locationStatus = 'Tidak Diketahui';
@@ -105,16 +107,22 @@ class AttendanceController extends Controller
         $photoPath = null;
         try {
             // ... (Logika simpan foto seperti sebelumnya) ...
-             if (preg_match('/^data:image\/(\w+);base64,/', $validated['selfie_data'], $type)) {
-                 $imageData = substr($validated['selfie_data'], strpos($validated['selfie_data'], ',') + 1);
-                 $type = strtolower($type[1]);
-                 if (!in_array($type, ['jpg', 'jpeg', 'png'])) { throw new \Exception('Format gambar tidak valid.'); }
-                 $imageData = base64_decode($imageData);
-                 if ($imageData === false) { throw new \Exception('Gagal decode base64.'); }
-                 $fileName = 'selfie_' . $user->id . '_' . date('Ymd_His') . '.' . $type;
-                 Storage::disk('public')->put('attendance_photos/' . $fileName, $imageData);
-                 $photoPath = 'attendance_photos/' . $fileName;
-             } else { throw new \Exception('Data URI gambar tidak valid.'); }
+            if (preg_match('/^data:image\/(\w+);base64,/', $validated['selfie_data'], $type)) {
+                $imageData = substr($validated['selfie_data'], strpos($validated['selfie_data'], ',') + 1);
+                $type = strtolower($type[1]);
+                if (!in_array($type, ['jpg', 'jpeg', 'png'])) {
+                    throw new \Exception('Format gambar tidak valid.');
+                }
+                $imageData = base64_decode($imageData);
+                if ($imageData === false) {
+                    throw new \Exception('Gagal decode base64.');
+                }
+                $fileName = 'selfie_' . $user->id . '_' . date('Ymd_His') . '.' . $type;
+                Storage::disk('public')->put('attendance_photos/' . $fileName, $imageData);
+                $photoPath = 'attendance_photos/' . $fileName;
+            } else {
+                throw new \Exception('Data URI gambar tidak valid.');
+            }
         } catch (\Exception $e) {
             Log::error("Selfie upload failed for user {$user->id}: " . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Gagal menyimpan foto selfie.'], 500);
@@ -126,40 +134,46 @@ class AttendanceController extends Controller
         try {
             if ($validated['action'] === 'check_in') {
                 // ... (Logika create attendance seperti sebelumnya) ...
-                 $existingAttendance = Attendance::where('user_id', $user->id)->where('attendance_date', $today)->first();
-                 if ($existingAttendance) { DB::rollBack(); if($photoPath && Storage::disk('public')->exists($photoPath)) Storage::disk('public')->delete($photoPath); return response()->json(['success' => false, 'message' => 'Anda sudah check-in hari ini.'], 409); }
-                 Attendance::create([
-                     'user_id' => $user->id,
-                     'shift_id' => $validated['shift_id'],
-                     'attendance_date' => $today,
-                     'clock_in_time' => $now,
-                     'clock_in_latitude' => $validated['latitude'],
-                     'clock_in_longitude' => $validated['longitude'],
-                     'clock_in_photo_path' => $photoPath,
-                     'clock_in_location_status' => $locationStatus,
-                 ]);
-                 $message = 'Check-in berhasil dicatat.';
-
+                $existingAttendance = Attendance::where('user_id', $user->id)->where('attendance_date', $today)->first();
+                if ($existingAttendance) {
+                    DB::rollBack();
+                    if ($photoPath && Storage::disk('public')->exists($photoPath)) Storage::disk('public')->delete($photoPath);
+                    return response()->json(['success' => false, 'message' => 'Anda sudah check-in hari ini.'], 409);
+                }
+                Attendance::create([
+                    'user_id' => $user->id,
+                    'shift_id' => $validated['shift_id'],
+                    'attendance_date' => $today,
+                    'clock_in_time' => $now,
+                    'clock_in_latitude' => $validated['latitude'],
+                    'clock_in_longitude' => $validated['longitude'],
+                    'clock_in_photo_path' => $photoPath,
+                    'clock_in_location_status' => $locationStatus,
+                ]);
+                $message = 'Check-in berhasil dicatat.';
             } elseif ($validated['action'] === 'check_out') {
                 // ... (Logika update attendance seperti sebelumnya) ...
-                 $attendance = Attendance::where('user_id', $user->id)->where('attendance_date', $today)->whereNull('clock_out_time')->first();
-                 if (!$attendance) { DB::rollBack(); if($photoPath && Storage::disk('public')->exists($photoPath)) Storage::disk('public')->delete($photoPath); return response()->json(['success' => false, 'message' => 'Data check-in tidak ditemukan.'], 404); }
-                 $attendance->update([
-                     'clock_out_time' => $now,
-                     'clock_out_latitude' => $validated['latitude'],
-                     'clock_out_longitude' => $validated['longitude'],
-                     'clock_out_photo_path' => $photoPath,
-                     'clock_out_location_status' => $locationStatus,
-                 ]);
-                 $message = 'Check-out berhasil dicatat.';
+                $attendance = Attendance::where('user_id', $user->id)->where('attendance_date', $today)->whereNull('clock_out_time')->first();
+                if (!$attendance) {
+                    DB::rollBack();
+                    if ($photoPath && Storage::disk('public')->exists($photoPath)) Storage::disk('public')->delete($photoPath);
+                    return response()->json(['success' => false, 'message' => 'Data check-in tidak ditemukan.'], 404);
+                }
+                $attendance->update([
+                    'clock_out_time' => $now,
+                    'clock_out_latitude' => $validated['latitude'],
+                    'clock_out_longitude' => $validated['longitude'],
+                    'clock_out_photo_path' => $photoPath,
+                    'clock_out_location_status' => $locationStatus,
+                ]);
+                $message = 'Check-out berhasil dicatat.';
             }
 
             DB::commit();
             return response()->json(['success' => true, 'message' => $message]);
-
         } catch (\Exception $e) {
             DB::rollBack();
-            if($photoPath && Storage::disk('public')->exists($photoPath)) Storage::disk('public')->delete($photoPath);
+            if ($photoPath && Storage::disk('public')->exists($photoPath)) Storage::disk('public')->delete($photoPath);
             Log::error("Error storing attendance for user {$user->id}: " . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Gagal menyimpan data absensi.'], 500);
         }

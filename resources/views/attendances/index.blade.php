@@ -10,11 +10,9 @@
     <style>
         /* Beri tinggi spesifik untuk iframe peta */
         .map-container {
-            position: relative;
             width: 100%;
-            padding-bottom: 56.25%;
-            /* Aspect ratio 16:9 */
-            height: 0;
+            max-width: 500px;
+            height: 300px;
             overflow: hidden;
             margin-bottom: 15px;
             border: 1px solid #ccc;
@@ -24,11 +22,13 @@
 
         /* Iframe peta */
         #map-iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
+            /* Hapus position absolute */
+            /* position: absolute; */
+            /* top: 0; */
+            /* left: 0; */
             width: 100% !important;
             height: 100% !important;
+            /* Iframe mengisi tinggi container */
             border: none;
         }
 
