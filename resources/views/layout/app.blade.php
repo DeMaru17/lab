@@ -15,6 +15,9 @@
     <link rel="stylesheet" href="{{ asset('assets/compiled/css/iconly.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/extensions/simple-datatables/style.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/compiled/css/table-datatable.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+    
     @stack('css')
 
 </head>
@@ -85,6 +88,8 @@
         </script>
 
         <script src="{{ asset('assets/extensions/simple-datatables/umd/simple-datatables.js') }}"></script>
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+        <script src="https://npmcdn.com/flatpickr/dist/l10n/id.js"></script> {{-- Untuk lokalisasi Indonesia --}}
 
 
         @include('inc.footer')

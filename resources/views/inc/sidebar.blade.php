@@ -52,24 +52,63 @@
 
                 </li>
 
-                <li class="sidebar-item {{ request()->routeIs('attendances.*') ? 'active' : '' }}">
-                    {{-- Link utama ke halaman index absensi --}}
+                @php
+                    // Ambil user yang login sekali saja
+                    $loggedInUser = Auth::user();
+                    $isManajemen = $loggedInUser?->role === 'manajemen'; // Cek jika user ada
+                    $isAsisten =
+                        $isManajemen &&
+                        in_array($loggedInUser->jabatan, ['asisten manager analis', 'asisten manager preparator']);
+
+                    // Helper untuk mengecek apakah route saat ini berada di bawah prefix Absensi atau Koreksi
+                    // Termasuk halaman approval koreksi
+                    $isAttendanceSectionActive =
+                        request()->is('attendances*') || request()->is('attendance-corrections*');
+                @endphp
+
+                {{-- Menu Utama Absensi --}}
+                <li class="sidebar-item has-sub {{ $isAttendanceSectionActive ? 'active' : '' }}">
                     <a href="{{ route('attendances.index') }}" class='sidebar-link'>
                         <i class="bi bi-person-check-fill"></i> {{-- Ikon Absensi --}}
                         <span>Absensi</span>
                     </a>
-                    {{-- Bagian Submenu (Saat ini dikomentari/tidak aktif) --}}
-                    {{-- Jika nanti Anda butuh submenu, hapus komentar di bawah dan sesuaikan --}}
-                    <ul class="submenu {{ request()->routeIs('attendances.*') ? 'active' : '' }}">
-                        <li class="submenu-item {{ request()->routeIs('attendances.index') ? 'active' : '' }}">
-                            <a href="{{ route('attendances.index') }}" class="submenu-link">Absen Hari Ini</a>
-                        </li>
+                    {{-- Submenu Absensi --}}
+                    <ul class="submenu {{ $isAttendanceSectionActive ? 'active' : '' }}">
+                        {{-- Submenu: Absen Hari Ini --}}
+                        @if (in_array($loggedInUser?->role, ['personil', 'admin']))
+                            <li class="submenu-item {{ request()->routeIs('attendances.index') ? 'active' : '' }}">
+                                <a href="{{ route('attendances.index') }}" class="submenu-link">Absen Hari Ini</a>
+                            </li>
+                        @endif
+
+                        {{-- Submenu: Riwayat Absensi (Placeholder) --}}
                         <li class="submenu-item {{-- request()->routeIs('attendances.history') ? 'active' : '' --}}">
+                            {{-- Ganti href="#" dengan route riwayat jika sudah dibuat --}}
                             <a href="#" {{-- href="{{ route('attendances.history') }}" --}} class="submenu-link">Riwayat Absensi</a>
                         </li>
-                        <li class="submenu-item {{-- request()->routeIs('attendances.correction.create') ? 'active' : '' --}}">
-                            <a href="#" {{-- href="{{ route('attendances.correction.create') }}" --}} class="submenu-link">Ajukan Koreksi</a>
-                        </li>
+
+                        {{-- Submenu: Ajukan Koreksi (Untuk Personil & Admin) --}}
+                        @if (in_array($loggedInUser?->role, ['personil', 'admin']))
+                            <li
+                                class="submenu-item {{ request()->routeIs('attendance_corrections.index') ? 'active' : '' }}">
+                                <a href="{{ route('attendance_corrections.index') }}" class="submenu-link">Koreksi Absensi</a>
+                            </li>
+                        @endif
+
+                        {{-- TODO: Tambahkan submenu untuk Daftar Koreksi Saya jika perlu --}}
+                        {{-- <li class="submenu-item {{ request()->routeIs('attendance_corrections.index') ? 'active' : '' }}">
+                            <a href="{{ route('attendance_corrections.index') }}" class="submenu-link">Daftar Koreksi Saya</a>
+                        </li> --}}
+
+                        {{-- Submenu: Approval Koreksi (Hanya Asisten Manajer) --}}
+                        @if ($isAsisten)
+                            {{-- Gunakan routeIs dengan wildcard untuk mencakup semua route approval --}}
+                            <li
+                                class="submenu-item {{ request()->routeIs('attendance_corrections.approval.*') ? 'active' : '' }}">
+                                <a href="{{ route('attendance_corrections.approval.list') }}"
+                                    class="submenu-link">Approval Koreksi</a>
+                            </li>
+                        @endif
                     </ul>
                     {{-- Akhir Bagian Submenu --}}
                 </li>

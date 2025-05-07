@@ -13,6 +13,7 @@ use App\Http\Controllers\OvertimeRecapController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\AttendanceCorrectionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -141,5 +142,44 @@ Route::middleware('auth')->group(function () {
         // Route::post('/correction', [AttendanceController::class, 'storeCorrection'])->name('correction.store');
     });
     // === AKHIR ROUTE ABSENSI ===
+
+    // === MODUL KOREKSI ABSENSI ===
+    Route::prefix('attendance-corrections')->name('attendance_corrections.')->group(function () {
+        // Menampilkan form untuk membuat pengajuan koreksi baru
+        // Parameter {attendance?} dibuat opsional, karena bisa saja mengoreksi 'Alpha' murni
+        // atau kita bisa putuskan untuk selalu butuh tanggal, bukan ID attendance
+        Route::get('/create/{attendance_date?}', [App\Http\Controllers\AttendanceCorrectionController::class, 'create'])->name('create');
+
+        // Menyimpan pengajuan koreksi baru
+        Route::post('/', [App\Http\Controllers\AttendanceCorrectionController::class, 'store'])->name('store');
+
+        // TODO: Tambahkan route untuk daftar pengajuan user (milik sendiri)
+        // Route::get('/', [App\Http\Controllers\AttendanceCorrectionController::class, 'index'])->name('index');
+
+        Route::get('/', [AttendanceCorrectionController::class, 'index'])
+             ->middleware(['role:personil,admin']) // Sesuaikan jika admin perlu lihat semua di halaman lain
+             ->name('index');
+
+
+        Route::get('/get-original-data/{date}', [App\Http\Controllers\AttendanceCorrectionController::class, 'getOriginalData'])
+        ->where('date', '[0-9]{4}-[0-9]{2}-[0-9]{2}') // Validasi format tanggal YYYY-MM-DD
+        ->name('get_original_data');
+
+        // Middleware 'role:manajemen' ditambahkan di sini untuk membatasi akses awal
+        Route::middleware(['role:manajemen'])->prefix('approval')->name('approval.')->group(function() {
+            // Menampilkan daftar koreksi yang menunggu persetujuan
+            Route::get('/', [AttendanceCorrectionController::class, 'listForApproval'])->name('list');
+
+            // Memproses persetujuan (Approve)
+            // Menggunakan PATCH karena kita memodifikasi resource yang ada
+            // Menggunakan Route Model Binding untuk $correction
+            Route::patch('/{correction}/approve', [AttendanceCorrectionController::class, 'approve'])->name('approve');
+
+            // Memproses penolakan (Reject)
+            // Menggunakan PATCH atau POST bisa, PATCH lebih sesuai
+            Route::patch('/{correction}/reject', [AttendanceCorrectionController::class, 'reject'])->name('reject');
+        });
+    });
+    // === AKHIR MODUL KOREKSI ABSENSI ===
 
 }); // Akhir middleware 'auth' group

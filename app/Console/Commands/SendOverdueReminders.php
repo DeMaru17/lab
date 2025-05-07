@@ -28,7 +28,7 @@ class SendOverdueReminders extends Command
         $this->info('Memulai pengecekan pengajuan overdue (Cuti & Lembur)...');
         Log::info('Scheduled Task ' . $this->signature . ' started.');
 
-        $overdueDays = 7;
+        $overdueDays = 3;
         $today = Carbon::today();
         $cutoffDate = $today->copy()->subDays($overdueDays);
 

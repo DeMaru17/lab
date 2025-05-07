@@ -38,6 +38,7 @@ class Attendance extends Model
         'attendance_status', // Diisi oleh scheduled task
         'notes',
         'is_corrected', // Diubah jika ada koreksi
+        'last_correction_reminder_sent_at', // Timestamp untuk pengingat
     ];
 
     /**
@@ -54,6 +55,7 @@ class Attendance extends Model
         'clock_out_latitude'        => 'decimal:8',
         'clock_out_longitude'       => 'decimal:8',
         'is_corrected'              => 'boolean',
+        'last_correction_reminder_sent_at' => 'datetime', // Timestamp untuk pengingat
         // created_at dan updated_at otomatis
     ];
 
