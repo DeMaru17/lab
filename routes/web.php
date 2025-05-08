@@ -14,6 +14,7 @@ use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\AttendanceCorrectionController;
+use App\Http\Controllers\MonthlyTimesheetController;
 
 /*
 |--------------------------------------------------------------------------
@@ -157,16 +158,16 @@ Route::middleware('auth')->group(function () {
         // Route::get('/', [App\Http\Controllers\AttendanceCorrectionController::class, 'index'])->name('index');
 
         Route::get('/', [AttendanceCorrectionController::class, 'index'])
-             ->middleware(['role:personil,admin']) // Sesuaikan jika admin perlu lihat semua di halaman lain
-             ->name('index');
+            ->middleware(['role:personil,admin']) // Sesuaikan jika admin perlu lihat semua di halaman lain
+            ->name('index');
 
 
         Route::get('/get-original-data/{date}', [App\Http\Controllers\AttendanceCorrectionController::class, 'getOriginalData'])
-        ->where('date', '[0-9]{4}-[0-9]{2}-[0-9]{2}') // Validasi format tanggal YYYY-MM-DD
-        ->name('get_original_data');
+            ->where('date', '[0-9]{4}-[0-9]{2}-[0-9]{2}') // Validasi format tanggal YYYY-MM-DD
+            ->name('get_original_data');
 
         // Middleware 'role:manajemen' ditambahkan di sini untuk membatasi akses awal
-        Route::middleware(['role:manajemen'])->prefix('approval')->name('approval.')->group(function() {
+        Route::middleware(['role:manajemen'])->prefix('approval')->name('approval.')->group(function () {
             // Menampilkan daftar koreksi yang menunggu persetujuan
             Route::get('/', [AttendanceCorrectionController::class, 'listForApproval'])->name('list');
 
@@ -182,4 +183,29 @@ Route::middleware('auth')->group(function () {
     });
     // === AKHIR MODUL KOREKSI ABSENSI ===
 
+    Route::prefix('monthly-timesheets')->name('monthly_timesheets.')->group(function () {
+
+        // Halaman Index (bisa diakses semua role terotentikasi)
+        Route::get('/', [MonthlyTimesheetController::class, 'index'])->name('index');
+        Route::get('/{timesheet}', [MonthlyTimesheetController::class, 'show'])->name('show'); // Menampilkan detail timesheet
+
+        // Route Export (bisa diakses semua role terotentikasi, otorisasi di controller/policy)
+        Route::get('/{timesheet}/export/{format}', [MonthlyTimesheetController::class, 'export'])
+            ->where('format', '(pdf|excel)') // Hanya izinkan pdf atau excel
+            ->name('export');
+
+        // Grup Approval (Hanya Manajemen)
+        Route::middleware(['role:manajemen'])->prefix('approval')->name('approval.')->group(function () {
+            Route::get('/asisten', [MonthlyTimesheetController::class, 'listForAsistenApproval'])->name('asisten.list');
+            Route::patch('/{timesheet}/approve/asisten', [MonthlyTimesheetController::class, 'approveAsisten'])->name('asisten.approve');
+            Route::get('/manager', [MonthlyTimesheetController::class, 'listForManagerApproval'])->name('manager.list');
+            Route::patch('/{timesheet}/approve/manager', [MonthlyTimesheetController::class, 'approveManager'])->name('manager.approve');
+            Route::patch('/{timesheet}/reject', [MonthlyTimesheetController::class, 'reject'])->name('reject');
+            Route::post('/bulk-approve', [MonthlyTimesheetController::class, 'bulkApprove'])->name('bulk.approve'); // Method POST
+        });
+
+        // TODO: Route untuk show detail jika perlu
+        // Route::get('/{timesheet}', [MonthlyTimesheetController::class, 'show'])->name('show');
+
+    });
 }); // Akhir middleware 'auth' group
