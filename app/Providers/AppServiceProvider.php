@@ -13,6 +13,8 @@ use App\Models\Overtime;            // <-- Import model Overtime
 use App\Policies\OvertimePolicy;    // <-- Import OvertimePolicy
 use App\Models\AttendanceCorrection; // <-- Import model AttendanceCorrection
 use App\Policies\AttendanceCorrectionPolicy; // <-- Import AttendanceCorrectionPolicy
+use App\Models\MonthlyTimesheet;   // <-- Import model MonthlyTimesheet
+use App\Policies\MonthlyTimesheetPolicy; // <-- Import MonthlyTimesheetPolicy
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -34,6 +36,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(PerjalananDinas::class, PerjalananDinasPolicy::class);
         Gate::policy(Overtime::class, OvertimePolicy::class);
         Gate::policy(AttendanceCorrection::class, AttendanceCorrectionPolicy::class);
+        Gate::policy(MonthlyTimesheet::class, MonthlyTimesheetPolicy::class);
         Paginator::useBootstrapFive();
 
         // Daftarkan policy lain jika ada

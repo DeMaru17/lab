@@ -108,12 +108,12 @@
 
                     {{-- Tombol Aksi Massal --}}
                     <div class="mb-3">
-                         @can('bulkApproveManager', \App\Models\MonthlyTimesheet::class) {{-- Policy bulk L2 --}}
-                        <button type="button" class="btn btn-primary btn-sm" id="bulk-approve-btn-manager" {{-- ID unik --}}
+                         {{-- @can('bulkApproveManager', \App\Models\MonthlyTimesheet::class) Policy bulk L2 --}}
+                        <button type="button" class="btn btn-success btn-sm" id="bulk-approve-btn-manager" {{-- ID unik --}}
                             data-bs-toggle="modal" data-bs-target="#bulkApproveConfirmModalTimesheet" disabled> {{-- Target modal SAMA --}}
-                            <i class="bi bi-check-all"></i> Setujui Final yang Dipilih (<span class="selected-count-display">0</span>) {{-- Kelas counter sama --}}
+                            <i class="bi bi-check-lg"></i> Setujui Final yang Dipilih (<span class="selected-count-display">0</span>) {{-- Kelas counter sama --}}
                         </button>
-                        @endcan
+                        {{-- @endcan --}}
                          {{-- Tambah tombol bulk reject jika perlu --}}
                     </div>
 
@@ -154,8 +154,8 @@
                                                 <i class="bi bi-eye"></i>
                                             </a>
                                             {{-- Tombol Reject Individual (Manager) --}}
-                                            @can('reject', $timesheet)
-                                                @if(in_array($timesheet->status, ['pending_manager_approval'])) {{-- Hanya reject yg menunggu dia --}}
+                                            {{-- @can('reject', $timesheet) --}}
+                                                @if(in_array($timesheet->status, ['pending_manager'])) {{-- Hanya reject yg menunggu dia --}}
                                                 <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#rejectTimesheetModal"
                                                     data-timesheet-id="{{ $timesheet->id }}"
                                                     data-user-name="{{ $timesheet->user?->name ?? 'N/A' }}"
@@ -163,7 +163,7 @@
                                                     <i class="bi bi-x-lg"></i>
                                                 </button>
                                                 @endif
-                                            @endcan
+                                            {{-- @endcan --}}
                                         </td>
                                     </tr>
                                 @empty
@@ -225,7 +225,7 @@
                 </div>
                 <form id="rejectTimesheetForm" method="POST" action=""> {{-- Action diisi oleh JS --}}
                     @csrf
-                    @method('PUT')
+                    @method('PATCH')
                     <div class="modal-body">
                         <p>Anda akan menolak timesheet untuk karyawan: <strong id="rejectTimesheetUserName">Nama Karyawan</strong>.</p>
                         <div class="mb-3">

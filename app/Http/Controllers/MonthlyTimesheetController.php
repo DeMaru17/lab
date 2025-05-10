@@ -41,7 +41,7 @@ class MonthlyTimesheetController extends Controller
     public function index(Request $request)
     {
         // Otorisasi: Pastikan user boleh melihat daftar umum ini
-        // $this->authorize('viewAny', MonthlyTimesheet::class); // Menggunakan Policy
+        $this->authorize('viewAny', MonthlyTimesheet::class); // Menggunakan Policy
 
         $user = Auth::user();
         $perPage = 20;
@@ -129,7 +129,7 @@ class MonthlyTimesheetController extends Controller
     {
         $user = Auth::user();
         // Otorisasi via Policy (lebih baik) atau cek jabatan manual
-        // $this->authorize('viewAsistenApprovalList', MonthlyTimesheet::class);
+        $this->authorize('viewAsistenApprovalList', MonthlyTimesheet::class);
         // if (!in_array($user->jabatan, ['asisten manager analis', 'asisten manager preparator'])) {
         //     abort(403, 'Hanya Asisten Manager yang dapat mengakses halaman ini.');
         // }
@@ -188,7 +188,7 @@ class MonthlyTimesheetController extends Controller
     public function listForManagerApproval(Request $request)
     {
         // Otorisasi via Policy atau cek jabatan
-        // $this->authorize('viewManagerApprovalList', MonthlyTimesheet::class);
+        $this->authorize('viewManagerApprovalList', MonthlyTimesheet::class);
         // if (Auth::user()->jabatan !== 'manager') {
         //     abort(403, 'Hanya Manager yang dapat mengakses halaman ini.');
         // }
@@ -196,7 +196,7 @@ class MonthlyTimesheetController extends Controller
         $perPage = 20;
 
         // Query dasar: status 'pending_manager_approval'
-        $query = MonthlyTimesheet::where('status', 'pending_manager_approval')
+        $query = MonthlyTimesheet::where('status', 'pending_manager')
             ->with([
                 'user:id,name,jabatan,vendor_id',
                 'user.vendor:id,name',
@@ -261,7 +261,7 @@ class MonthlyTimesheetController extends Controller
     public function show(MonthlyTimesheet $timesheet) // Variabel $timesheet
     {
         // Otorisasi: Pastikan user boleh melihat timesheet spesifik ini
-        // $this->authorize('view', $timesheet); // Menggunakan Policy
+        $this->authorize('view', $timesheet); // Menggunakan Policy
 
         // Load relasi yang dibutuhkan untuk menampilkan info ringkasan
         $timesheet->loadMissing([
@@ -323,7 +323,7 @@ class MonthlyTimesheetController extends Controller
     public function approveAsisten(MonthlyTimesheet $timesheet) // Variabel $timesheet
     {
         // Otorisasi
-        // $this->authorize('approveAsisten', $timesheet);
+        $this->authorize('approveAsisten', $timesheet);
 
         // Validasi Status
         if (!in_array($timesheet->status, ['generated', 'rejected'])) {
@@ -363,7 +363,7 @@ class MonthlyTimesheetController extends Controller
     public function approveManager(MonthlyTimesheet $timesheet) // Variabel $timesheet
     {
         // Otorisasi
-        // $this->authorize('approveManager', $timesheet);
+        $this->authorize('approveManager', $timesheet);
 
         // Validasi Status
         if (!in_array($timesheet->status, ['pending_manager_approval', 'rejected'])) {
@@ -405,7 +405,7 @@ class MonthlyTimesheetController extends Controller
     public function reject(Request $request, MonthlyTimesheet $timesheet) // Variabel $timesheet
     {
         // Otorisasi
-        // $this->authorize('reject', $timesheet);
+        $this->authorize('reject', $timesheet);
 
         // Validasi Input Alasan
         $validated = $request->validate([
@@ -448,12 +448,12 @@ class MonthlyTimesheetController extends Controller
         // Redirect kembali ke daftar approval yang relevan
         $user = Auth::user();
         if ($user->jabatan === 'manager') {
-            return redirect()->route('monthly-timesheets.approval.manager.list');
+            return redirect()->route('monthly_timesheets.approval.manager.list');
         } elseif (in_array($user->jabatan, ['asisten manager analis', 'asisten manager preparator'])) {
-            return redirect()->route('monthly-timesheets.approval.asisten.list');
+            return redirect()->route('monthly_timesheets.approval.asisten.list');
         } else {
             // Fallback (seharusnya tidak terjadi jika otorisasi benar)
-            return redirect()->route('monthly-timesheets.index');
+            return redirect()->route('monthly_timesheets.index');
         }
     }
 
@@ -465,10 +465,10 @@ class MonthlyTimesheetController extends Controller
      * @param  \App\Models\MonthlyTimesheet  $timesheet // Variabel $timesheet
      * @return \Illuminate\Http\Response
      */
-    public function exportPdf(MonthlyTimesheet $timesheet) // Variabel $timesheet
+    public function export(MonthlyTimesheet $timesheet) // Variabel $timesheet
     {
         // Otorisasi
-        // $this->authorize('exportPdf', $timesheet); // Atau 'view'
+        $this->authorize('export', $timesheet); // Atau 'view'
 
         // Load relasi
         $timesheet->loadMissing([
@@ -547,6 +547,8 @@ class MonthlyTimesheetController extends Controller
      */
     public function bulkApprove(Request $request)
     {
+
+        $this->authorize('bulkApprove', MonthlyTimesheet::class); // Otorisasi
         // 1. Validasi Input
         $validator = Validator::make($request->all(), [
             'selected_ids'   => 'required|array',
@@ -606,7 +608,7 @@ class MonthlyTimesheetController extends Controller
                     }
 
                     if ($canProcess) {
-                        $timesheet->status = 'pending_manager_approval';
+                        $timesheet->status = 'pending_manager';
                         $timesheet->approved_by_asisten_id = $approver->id;
                         $timesheet->approved_at_asisten = now();
                         $timesheet->rejected_by_id = null;
@@ -618,10 +620,10 @@ class MonthlyTimesheetController extends Controller
                     }
                 } elseif ($approvalLevel === 'manager') {
                     // Validasi status & otorisasi Manager
-                    if ($timesheet->status === 'pending_manager_approval') { // Hanya approve yg menunggu manager
+                    if ($timesheet->status === 'pending_manager') { // Hanya approve yg menunggu manager
                         $canProcess = true;
                     } else {
-                        $errorMessage = "Status bukan 'pending_manager_approval'.";
+                        $errorMessage = "Status bukan 'pending_manager'.";
                     }
 
                     if ($canProcess) {

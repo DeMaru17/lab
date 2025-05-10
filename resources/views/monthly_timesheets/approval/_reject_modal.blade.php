@@ -8,7 +8,7 @@
             </div>
             <form id="rejectTimesheetForm" method="POST" action=""> {{-- Action diisi oleh JS --}}
                 @csrf
-                @method('PUT') {{-- Sesuaikan method route --}}
+                @method('PATCH') {{-- Sesuaikan method route --}}
                 <div class="modal-body">
                     <p>Anda akan menolak timesheet untuk karyawan: <strong id="rejectTimesheetUserName">Nama Karyawan</strong>.</p>
                     <div class="mb-3">
