@@ -17,8 +17,9 @@
     <link rel="stylesheet" href="{{ asset('assets/compiled/css/table-datatable.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
-    
+
     @stack('css')
+    @stack('styles')
 
 </head>
 

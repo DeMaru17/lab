@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 namespace App\Helpers; // Sesuaikan namespace
 
@@ -13,11 +13,11 @@ class StatusHelper
     public static function timesheetStatusColor(?string $status): string
     {
         return match (strtolower($status ?? '')) {
-            'approved' => 'success',
-            'pending_manager_approval' => 'info',
-            'pending_asisten' => 'warning', // Atau 'primary' / 'secondary'
-            'generated' => 'secondary', // Atau 'light text-dark'
-            'rejected' => 'danger',
+            'approved' => 'bg-success',
+            'pending_manager_approval' => 'bg-info',
+            'pending_asisten' => 'bg-warning', // Atau 'primary' / 'secondary'
+            'generated' => 'bg-secondary', // Atau 'light text-dark'
+            'rejected' => 'bg-danger',
             default => 'dark', // Status tidak dikenal
         };
     }
@@ -30,23 +30,23 @@ class StatusHelper
      */
     public static function attendanceStatusColor(?string $status): string
     {
-         // Gunakan strtolower untuk case-insensitive matching
+        // Gunakan strtolower untuk case-insensitive matching
         return match (strtolower($status ?? '')) {
-            'hadir' => 'success',
-            'terlambat' => 'warning',
-            'pulang cepat' => 'warning', // Mungkin warna sama dengan terlambat?
-            'terlambat & pulang cepat' => 'warning',
-            'alpha' => 'danger',
-            'sakit' => 'primary', // Warna berbeda untuk Sakit
-            'cuti' => 'info',    // Warna berbeda untuk Cuti
-            'dinas luar' => 'secondary',
-            'lembur' => 'primary', // Warna untuk Lembur di hari libur
-            'libur' => 'light text-dark', // Warna untuk Libur
+            'hadir' => 'bg-success',
+            'terlambat' => 'bg-warning',
+            'pulang cepat' => 'bg-warning', // Mungkin warna sama dengan terlambat?
+            'terlambat & pulang cepat' => 'bg-warning',
+            'alpha' => 'bg-danger',
+            'sakit' => 'bg-primary', // Warna berbeda untuk Sakit
+            'cuti' => 'bg-info',    // Warna berbeda untuk Cuti
+            'dinas luar' => 'bg-secondary',
+            'lembur' => 'bg-primary', // Warna untuk Lembur di hari libur
+            'libur' => 'bg-light text-dark', // Warna untuk Libur
             default => 'dark', // Status tidak dikenal atau null
         };
     }
 
-     /**
+    /**
      * Mendapatkan kelas warna Bootstrap berdasarkan status pengajuan umum (Cuti/Lembur).
      * Anda bisa menambahkan ini jika diperlukan di view lain.
      *
@@ -56,11 +56,11 @@ class StatusHelper
     public static function submissionStatusColor(?string $status): string
     {
         return match (strtolower($status ?? '')) {
-            'approved' => 'success',
-            'pending_manager_approval' => 'info',
-            'pending' => 'warning', // Status awal Cuti/Lembur
-            'rejected' => 'danger',
-            'cancelled' => 'secondary',
+            'approved' => 'bg-success',
+            'pending_manager_approval' => 'bg-info',
+            'pending' => 'bg-warning', // Status awal Cuti/Lembur
+            'rejected' => 'bg-danger',
+            'cancelled' => 'bg-secondary',
             default => 'dark',
         };
     }

@@ -188,6 +188,9 @@ Route::middleware('auth')->group(function () {
         // Halaman Index (bisa diakses semua role terotentikasi)
         Route::get('/', [MonthlyTimesheetController::class, 'index'])->name('index');
         Route::get('/{timesheet}', [MonthlyTimesheetController::class, 'show'])->name('show'); // Menampilkan detail timesheet
+        // routes/web.php
+        Route::post('/{timesheet}/force-reprocess', [MonthlyTimesheetController::class, 'forceReprocess'])->name('force-reprocess')
+            ->middleware(['role:admin,manajemen']); // Sesuaikan role
 
         // Route Export (bisa diakses semua role terotentikasi, otorisasi di controller/policy)
         Route::get('/{timesheet}/export/{format}', [MonthlyTimesheetController::class, 'export'])

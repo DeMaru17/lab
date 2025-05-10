@@ -53,121 +53,104 @@
                 </li>
 
                 {{-- ====================================================================== --}}
-                {{-- ==          BAGIAN MENU ABSENSI & TIMESHEET                         == --}}
+                {{-- ==               BAGIAN MENU ABSENSI & TIMESHEET                     == --}}
                 {{-- ====================================================================== --}}
 
-                {{-- Variabel helper (idealnya diletakkan sekali di awal file sidebar) --}}
                 @php
-                    // Pastikan Auth::user() dipanggil hanya sekali jika memungkinkan
-                    if (!isset($loggedInUser)) {
-                        // Cek jika belum didefinisikan sebelumnya
-                        $loggedInUser = Auth::user();
-                    }
+                    $loggedInUser = Auth::user();
+                    $isAbsensiTimesheetMenuActive = false; // Default
+
                     if ($loggedInUser) {
-                        // Cek jika user benar-benar login
-                        $userRole = $loggedInUser->role;
-                        $userJabatan = $loggedInUser->jabatan;
-
-                        $isManajemen = $userRole == 'manajemen';
-                        $isAsisten =
-                            $isManajemen &&
-                            in_array($userJabatan, ['asisten manager analis', 'asisten manager preparator']);
-                        $isManager = $isManajemen && $userJabatan == 'manager';
-                        $isAdmin = $userRole == 'admin';
-                        $isPersonil = $userRole == 'personil';
-
-                        // Kondisi untuk class 'active' di menu utama Absensi & Timesheet
-                        // Cek apakah route saat ini dimulai dengan prefix yang relevan
-                        // Gunakan nama route yang benar (dengan underscore)
                         $isAbsensiTimesheetMenuActive =
                             request()->routeIs('attendances.*') ||
-                            request()->routeIs('attendance_corrections.*') ||
-                            request()->routeIs('monthly_timesheets.*'); // Mencakup semua route timesheet termasuk approval
-                    } else {
-                        // Default values jika user tidak login (seharusnya tidak terjadi jika sidebar dilindungi middleware auth)
-                        $isManajemen = $isAsisten = $isManager = $isAdmin = $isPersonil = false;
-                        $isAbsensiTimesheetMenuActive = false;
+                            request()->routeIs('attendance_corrections.index') ||
+                            request()->routeIs('attendance_corrections.create') ||
+                            request()->routeIs('attendance_corrections.approval.list') ||
+                            request()->routeIs('monthly_timesheets.index') || // Ini akan aktif untuk semua yang akses index
+                            request()->routeIs('monthly_timesheets.show') ||
+                            request()->routeIs('monthly_timesheets.approval.asisten.list') ||
+                            request()->routeIs('monthly_timesheets.approval.manager.list');
                     }
                 @endphp
 
-                {{-- Menu Utama Absensi & Timesheet --}}
-                @if ($loggedInUser) {{-- Tampilkan hanya jika user login --}}
+                @if ($loggedInUser)
                     <li class="sidebar-item has-sub {{ $isAbsensiTimesheetMenuActive ? 'active' : '' }}">
                         <a href="#" class='sidebar-link'>
-                            <i class="bi bi-calendar-check-fill"></i> {{-- Ikon Absensi/Timesheet --}}
+                            <i class="bi bi-calendar-check-fill"></i>
                             <span>Absensi</span>
                         </a>
-                        {{-- Submenu Absensi & Timesheet --}}
                         <ul class="submenu {{ $isAbsensiTimesheetMenuActive ? 'active' : '' }}">
 
-                            {{-- 1. Submenu Absen Hari Ini (Personil & Admin) --}}
-                            @if ($isPersonil || $isAdmin)
+                            {{-- 1. Absen Hari Ini (Personil & Admin) --}}
+                            @if ($loggedInUser->role === 'personil' || $loggedInUser->role === 'admin')
                                 <li class="submenu-item {{ request()->routeIs('attendances.index') ? 'active' : '' }}">
                                     <a href="{{ route('attendances.index') }}" class="submenu-link">Absen Hari Ini</a>
                                 </li>
                             @endif
 
-                            {{-- 2. Submenu Koreksi Absensi (Personil & Admin) --}}
-                            @if ($isPersonil || $isAdmin)
-                                {{-- Aktif jika di index koreksi atau form create/edit koreksi --}}
+                            {{-- 2. Pengajuan Koreksi Saya (Personil & Admin) --}}
+                            @can('create', \App\Models\AttendanceCorrection::class)
                                 <li
-                                    class="submenu-item {{ request()->routeIs(['attendance_corrections.index', 'attendance_corrections.create', 'attendance_corrections.edit']) ? 'active' : '' }}">
-                                    <a href="{{ route('attendance_corrections.index') }}" class="submenu-link">Koreksi
-                                        Absensi</a>
+                                    class="submenu-item {{ request()->routeIs(['attendance_corrections.index', 'attendance_corrections.create']) ? 'active' : '' }}">
+                                    <a href="{{ route('attendance_corrections.index') }}" class="submenu-link">Pengajuan
+                                        Koreksi Absensi</a>
                                 </li>
-                            @endif
+                            @endcan
 
-                            {{-- 3. Submenu Rekap Timesheet (Admin & Manajemen) --}}
-                            {{-- Gunakan @can jika policy sudah ada --}}
-                            {{-- @can('viewAny', \App\Models\MonthlyTimesheet::class) --}}
-                            @if ($isAdmin || $isManajemen)
-                                {{-- Aktif jika di index rekap atau halaman show rekap --}}
+                            {{-- 3. Rekap Timesheet Saya (HANYA Personil) --}}
+                            @if ($loggedInUser->role === 'personil')
+                                {{-- Personil melihat daftar timesheet miliknya sendiri melalui route index standar --}}
                                 <li
-                                    class="submenu-item {{ request()->routeIs(['monthly_timesheets.index', 'monthly_timesheets.show']) ? 'active' : '' }}">
+                                    class="submenu-item {{ request()->routeIs('monthly_timesheets.index') || request()->routeIs('monthly_timesheets.show') ? 'active' : '' }}">
                                     <a href="{{ route('monthly_timesheets.index') }}" class="submenu-link">Rekap
                                         Absensi</a>
                                 </li>
-                                {{-- @endcan --}}
                             @endif
 
-                            {{-- 4. Submenu Approval Koreksi (Hanya Asisten) --}}
-                            @if ($isAsisten)
+                            {{-- 4. Rekap Timesheet Bulanan (Admin & Manajemen yang boleh lihat list umum) --}}
+                            {{-- Hanya tampilkan jika bukan personil, karena personil sudah punya menu sendiri --}}
+                            @if ($loggedInUser->role !== 'personil')
+                                @can('viewAny', \App\Models\MonthlyTimesheet::class)
+                                    <li
+                                        class="submenu-item {{ (request()->routeIs('monthly_timesheets.index') || request()->routeIs('monthly_timesheets.show')) && !request()->routeIs('monthly_timesheets.approval.*') ? 'active' : '' }}">
+                                        <a href="{{ route('monthly_timesheets.index') }}" class="submenu-link">Kelola Rekap
+                                            Absensi</a> {{-- Teks diubah --}}
+                                    </li>
+                                @endcan
+                            @endif
+
+                            {{-- 5. Approval Koreksi Absensi (Hanya Asisten) --}}
+                            @can('viewApprovalList', \App\Models\AttendanceCorrection::class)
                                 <li
                                     class="submenu-item {{ request()->routeIs('attendance_corrections.approval.list') ? 'active' : '' }}">
                                     <a href="{{ route('attendance_corrections.approval.list') }}"
-                                        class="submenu-link">Approval Koreksi Absen</a>
+                                        class="submenu-link">Approval Koreksi Absensi</a>
                                 </li>
-                            @endif
+                            @endcan
 
-                            {{-- 5. Submenu Approval Timesheet Asisten (Hanya Asisten) --}}
-                            @if ($isAsisten)
-                                {{-- Gunakan @can jika policy ada: @can('viewAsistenApprovalList', \App\Models\MonthlyTimesheet::class) --}}
+                            {{-- 6. Approval Timesheet Asisten (Hanya Asisten) --}}
+                            @can('viewAsistenApprovalList', \App\Models\MonthlyTimesheet::class)
                                 <li
                                     class="submenu-item {{ request()->routeIs('monthly_timesheets.approval.asisten.list') ? 'active' : '' }}">
                                     <a href="{{ route('monthly_timesheets.approval.asisten.list') }}"
-                                        class="submenu-link">Approval Absensi</a>
+                                        class="submenu-link">Approval Rekap Absensi</a>
                                 </li>
-                                {{-- @endcan --}}
-                            @endif
+                            @endcan
 
-                            {{-- 6. Submenu Approval Timesheet Manager (Hanya Manager) --}}
-                            @if ($isManager)
-                                {{-- Gunakan @can jika policy ada: @can('viewManagerApprovalList', \App\Models\MonthlyTimesheet::class) --}}
+                            {{-- 7. Approval Timesheet Manager (Hanya Manager) --}}
+                            @can('viewManagerApprovalList', \App\Models\MonthlyTimesheet::class)
                                 <li
                                     class="submenu-item {{ request()->routeIs('monthly_timesheets.approval.manager.list') ? 'active' : '' }}">
                                     <a href="{{ route('monthly_timesheets.approval.manager.list') }}"
-                                        class="submenu-link">Approval Absensi</a>
+                                        class="submenu-link">Approval Rekap Absensi</a>
                                 </li>
-                                {{-- @endcan --}}
-                            @endif
-
+                            @endcan
                         </ul>
                     </li>
                 @endif
                 {{-- ====================================================================== --}}
-                {{-- ==        AKHIR BAGIAN MENU ABSENSI & TIMESHEET                     == --}}
+                {{-- ==           AKHIR BAGIAN MENU ABSENSI & TIMESHEET                 == --}}
                 {{-- ====================================================================== --}}
-
 
 
                 {{-- Variabel helper untuk mempersingkat pengecekan (bisa diletakkan sekali di awal sidebar) --}}
@@ -304,27 +287,32 @@
                         <span>Perjalanan Dinas</span>
                     </a>
                 </li>
+                @php
+                    $user = Auth::user();
+                    $isAdmin = $user->role == 'admin';
+                @endphp
+                @if ($isAdmin)
+                    <li class="sidebar-item {{ Route::is('personil.*') ? 'active' : '' }}">
+                        <a href="{{ route('personil.index') }}" class='sidebar-link'>
+                            <i class="bi bi-people-fill"></i>
+                            <span>Personil</span>
+                        </a>
+                    </li>
 
-                <li class="sidebar-item {{ Route::is('personil.*') ? 'active' : '' }}">
-                    <a href="{{ route('personil.index') }}" class='sidebar-link'>
-                        <i class="bi bi-people-fill"></i>
-                        <span>Personil</span>
-                    </a>
-                </li>
+                    <li class="sidebar-item {{ Route::is('vendors.*') ? 'active' : '' }}">
+                        <a href="{{ route('vendors.index') }}" class='sidebar-link'>
+                            <i class="bi bi-grid-1x2-fill"></i>
+                            <span>Vendor</span>
+                        </a>
+                    </li>
 
-                <li class="sidebar-item {{ Route::is('vendors.*') ? 'active' : '' }}">
-                    <a href="{{ route('vendors.index') }}" class='sidebar-link'>
-                        <i class="bi bi-grid-1x2-fill"></i>
-                        <span>Vendor</span>
-                    </a>
-                </li>
-
-                <li class="sidebar-item {{ Route::is('Holidays.*') ? 'active' : '' }}">
-                    <a href="{{ route('holidays.index') }}" class='sidebar-link'>
-                        <i class="bi bi-calendar-x"></i>
-                        <span>Hari Libur</span>
-                    </a>
-                </li>
+                    <li class="sidebar-item {{ Route::is('Holidays.*') ? 'active' : '' }}">
+                        <a href="{{ route('holidays.index') }}" class='sidebar-link'>
+                            <i class="bi bi-calendar-x"></i>
+                            <span>Hari Libur</span>
+                        </a>
+                    </li>
+                @endif
 
                 <li class="sidebar-item {{ request()->routeIs('profile.*') ? 'active' : '' }}">
                     <a href="{{ route('profile.edit') }}" class='sidebar-link'>

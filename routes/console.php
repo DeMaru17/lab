@@ -49,51 +49,81 @@ Schedule::command('attendance:process-daily') // Panggil signature command
         // Mungkin tambahkan notifikasi ke admin jika gagal?
     });
 
-Schedule::call(function () {
-    $targetDate = Carbon::now()->subMonth(); // Ambil bulan lalu
-    $month = $targetDate->month;
-    $year = $targetDate->year;
-    // Panggil command dengan group internal dan tdp, serta bulan & tahun lalu
-    Artisan::call('timesheet:generate-monthly', [
-        '--group' => ['internal', 'tdp'], // Target grup
-        '--month' => $month,
-        '--year' => $year
-    ]);
-})
-    ->monthlyOn(1, '03:00') // Setiap tanggal 1 jam 3 pagi
+// --- PENJADWALAN TIMESHEET ---
+
+// 1. Jadwal Harian untuk Re-evaluasi Timesheet Rejected
+//    (Bulan Lalu & Bulan Ini untuk mengakomodasi semua periode vendor)
+Schedule::command('timesheet:generate-monthly', [
+    '--month' => now()->subMonthNoOverflow()->month, // Bulan lalu
+    '--year' => now()->subMonthNoOverflow()->year,
+    '--group' => ['internal', 'csi', 'tdp'] // Proses semua grup
+])->dailyAt('01:00') // Setiap hari jam 1 pagi
     ->timezone('Asia/Jakarta')
-    ->name('generate-timesheet-internal-tdp') // Beri nama unik
-    ->withoutOverlapping(120) // Timeout 120 menit jika perlu
-    ->onSuccess(function () {
-        Log::info('Scheduled task generate-timesheet-internal-tdp completed successfully.');
-    })
-    ->onFailure(function () {
-        Log::error('Scheduled task generate-timesheet-internal-tdp failed.');
-    });
+    ->name('re_evaluate_prev_month_timesheets')
+    ->withoutOverlapping(60);
+
+Schedule::command('timesheet:generate-monthly', [
+    '--month' => now()->month, // Bulan ini
+    '--year' => now()->year,
+    '--group' => ['internal', 'csi', 'tdp'] // Proses semua grup
+])->dailyAt('01:15') // Setiap hari jam 1:15 pagi
+    ->timezone('Asia/Jakarta')
+    ->name('re_evaluate_curr_month_timesheets')
+    ->withoutOverlapping(60);
 
 
-// 2. Generate untuk Vendor CSI (Periode: Tgl 16 Bulan Lalu s/d Tgl 15 Bulan Ini)
-//    Jalankan setiap tanggal 16, jam 03:15 pagi
+// 2. Jadwal Generasi Awal (Seperti yang sudah Anda miliki)
+//    Untuk Internal & TDP (Periode Bulan Lalu) - Setiap Tanggal 1
 Schedule::call(function () {
-    // Target tanggal untuk getUserPeriod adalah bulan ini,
-    // karena periode CSI berakhir di bulan ini (tanggal 15)
-    $targetDate = Carbon::now();
-    $month = $targetDate->month;
-    $year = $targetDate->year;
-    // Panggil command hanya untuk grup csi, dengan bulan & tahun ini
+    $targetDate = Carbon::now()->subMonthNoOverflow();
+    Log::info("Scheduling initial_generate_timesheet_internal_tdp for " . $targetDate->format('F Y'));
     Artisan::call('timesheet:generate-monthly', [
-        '--group' => ['csi'], // Target grup csi
-        '--month' => $month,
-        '--year' => $year
+        '--group' => ['internal', 'tdp'],
+        '--month' => $targetDate->month,
+        '--year' => $targetDate->year
+        // Tambahkan --force jika Anda ingin generasi awal selalu menimpa data yang mungkin sudah ada (hati-hati)
+        // '--force' => true
     ]);
-})
-    ->monthlyOn(16, '03:15') // Setiap tanggal 16 jam 3:15 pagi
+})->monthlyOn(1, '03:00') // Setiap tanggal 1 jam 3 pagi
     ->timezone('Asia/Jakarta')
-    ->name('generate-timesheet-csi') // Beri nama unik
+    ->name('initial_generate_timesheet_internal_tdp')
     ->withoutOverlapping(120)
     ->onSuccess(function () {
-        Log::info('Scheduled task generate-timesheet-csi completed successfully.');
+        Log::info('Scheduled task initial_generate_timesheet_internal_tdp completed successfully.');
     })
     ->onFailure(function () {
-        Log::error('Scheduled task generate-timesheet-csi failed.');
+        Log::error('Scheduled task initial_generate_timesheet_internal_tdp failed.');
+    });
+
+// Untuk Vendor CSI (Periode Potongan Bulan Ini) - Setiap Tanggal 16
+Schedule::call(function () {
+    $targetDate = Carbon::now(); // Untuk CSI, target bulan ini
+    Log::info("Scheduling initial_generate_timesheet_csi for " . $targetDate->format('F Y'));
+    Artisan::call('timesheet:generate-monthly', [
+        '--group' => ['csi'],
+        '--month' => $targetDate->month,
+        '--year' => $targetDate->year
+        // '--force' => true // idem
+    ]);
+})->monthlyOn(16, '03:15') // Setiap tanggal 16 jam 3:15 pagi
+    ->timezone('Asia/Jakarta')
+    ->name('initial_generate_timesheet_csi')
+    ->withoutOverlapping(120)
+    ->onSuccess(function () {
+        Log::info('Scheduled task initial_generate_timesheet_csi completed successfully.');
+    })
+    ->onFailure(function () {
+        Log::error('Scheduled task initial_generate_timesheet_csi failed.');
+    });
+
+Schedule::command('attendance:delete-old-selfies')
+    ->dailyAt('02:30') // Setiap hari jam 2:30 pagi
+    ->timezone('Asia/Jakarta')
+    ->name('delete_old_attendance_selfies')
+    ->withoutOverlapping(60) // Timeout 60 menit jika task berjalan lama
+    ->onSuccess(function () {
+        Log::info('Scheduled task attendance:delete-old-selfies completed successfully.');
+    })
+    ->onFailure(function () {
+        Log::error('Scheduled task attendance:delete-old-selfies failed.');
     });
