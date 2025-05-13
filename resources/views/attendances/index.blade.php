@@ -3,7 +3,7 @@
     // Import Carbon jika belum diimport di AppServiceProvider atau alias
     use Carbon\Carbon;
 @endphp
-@extends('layout.app') {{-- Sesuaikan dengan layout utama Anda --}}
+@extends('layout.app') 
 
 @push('css')
     {{-- CSS Khusus untuk Halaman Absensi --}}

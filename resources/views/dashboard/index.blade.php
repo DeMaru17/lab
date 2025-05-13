@@ -127,7 +127,7 @@
                                                 @if ($latestTimesheet)
                                                     <h5 class="font-extrabold mb-0">
                                                         <span
-                                                            class="badge bg-{{ App\Helpers\StatusHelper::timesheetStatusColor($latestTimesheet->status) }}">
+                                                            class="badge {{ App\Helpers\StatusHelper::timesheetStatusColor($latestTimesheet->status) }}">
                                                             {{ Str::title(str_replace('_', ' ', $latestTimesheet->status)) }}
                                                         </span>
                                                     </h5>
@@ -542,16 +542,6 @@
             border-radius: 0.25rem;
         }
 
-        /* Jika hari ini adalah weekend tapi bukan hari libur nasional, current-day akan menimpa weekend-day.
-               Jika Anda ingin hari ini yang weekend tetap merah, Anda perlu logika CSS atau kelas tambahan.
-               Untuk saat ini, 'current-day' akan lebih dominan jika bukan 'holiday-today'.
-               Jika ingin hari ini yang weekend juga merah, bisa tambahkan:
-            .dashboard-calendar td.current-day.weekend-day {
-                background-color: #ffcdd2 !important; // Contoh warna merah muda untuk today-weekend
-                color: #c62828 !important;
-                border: 2px solid #c62828 !important;
-            }
-            */
         .dashboard-calendar td[data-bs-toggle="tooltip"]:hover {
             cursor: help;
         }

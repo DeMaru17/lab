@@ -2,9 +2,7 @@
 @extends('layout.app')
 
 @push('css')
-    {{-- Tambahkan CSS untuk Simple DataTables jika ingin menggunakannya nanti --}}
-    {{-- <link rel="stylesheet" href="{{ asset('assets/extensions/simple-datatables/style.css') }}"> --}}
-    {{-- <link rel="stylesheet" href="{{ asset('assets/compiled/css/table-datatable.css') }}"> --}}
+
     <style>
         /* Style untuk modal reject */
         .swal2-textarea {
@@ -154,9 +152,7 @@
 @endsection
 
 @push('js')
-    {{-- Pastikan SweetAlert2 sudah dimuat di layout utama --}}
-    {{-- <script src="{{ asset('assets/extensions/sweetalert2/sweetalert2.min.js') }}"></script> --}}
-    {{-- <script src="{{ asset('assets/extensions/simple-datatables/umd/simple-datatables.js') }}"></script> --}}
+
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             // Inisialisasi Simple DataTables jika diperlukan

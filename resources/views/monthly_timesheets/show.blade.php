@@ -45,7 +45,8 @@
                     <h4 class="alert-heading"><i class="bi bi-x-octagon-fill"></i> Timesheet Ditolak!</h4>
                     <p>Timesheet untuk periode ini telah ditolak oleh
                         <strong>{{ $timesheet->rejecter?->name ?? 'N/A' }}</strong> pada tanggal
-                        {{ $timesheet->rejected_at ? $timesheet->rejected_at->format('d M Y H:i') : '-' }}.</p>
+                        {{ $timesheet->rejected_at ? $timesheet->rejected_at->format('d M Y H:i') : '-' }}.
+                    </p>
                     <p><strong>Alasan Penolakan:</strong>
                         {{ $timesheet->notes ?: 'Tidak ada alasan spesifik yang diberikan.' }}</p>
                     @if (Auth::id() == $timesheet->user_id)
@@ -242,7 +243,7 @@
                                         </td>
                                         <td class="text-center">
                                             <span
-                                                class="badge bg-{{ App\Helpers\StatusHelper::attendanceStatusColor($attendance->attendance_status) }}">
+                                                class="badge {{ App\Helpers\StatusHelper::attendanceStatusColor($attendance->attendance_status) }}">
                                                 {{ $attendance->attendance_status ?? 'N/A' }}
                                             </span>
                                         </td>

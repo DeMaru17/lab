@@ -1,4 +1,4 @@
-@extends('layout.app') {{-- Sesuaikan dengan layout utama Anda --}}
+@extends('layout.app') 
 
 @push('css')
     {{-- CSS Opsional untuk Simple DataTables --}}

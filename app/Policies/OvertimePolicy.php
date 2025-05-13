@@ -77,6 +77,27 @@ class OvertimePolicy
         // && Carbon::today()->lt($overtime->tanggal_lembur); // Uncomment jika perlu cek tanggal
     }
 
+
+    /**
+     * Determine whether the user can view the approval list.
+     * Siapa yang boleh melihat daftar cuti yang menunggu persetujuan?
+     */
+    public function viewAsistenApprovalList(User $user): bool
+    {
+        return $user->role === 'manajemen' &&
+            in_array($user->jabatan, ['asisten manager analis', 'asisten manager preparator']);
+    }
+
+    /**
+     * Determine whether the user can view the manager approval list.
+     * Siapa yang boleh melihat daftar cuti yang menunggu persetujuan manager?
+     */
+    public function viewManagerApprovalList(User $user): bool
+    {
+        return $user->role === 'manajemen' && $user->jabatan === 'manager';
+    }
+
+
     // === Metode Custom untuk Approval ===
 
     /**

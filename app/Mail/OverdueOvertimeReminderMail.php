@@ -3,28 +3,48 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldQueue; // Opsional: Implementasikan jika ingin email dikirim via antrian.
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Collection;
-use App\Models\User; // Import User model
+use Illuminate\Support\Collection; // Untuk menampung daftar pengajuan.
+use App\Models\User; // Model User untuk data approver.
 
-// Anda bisa implement ShouldQueue jika ingin email dikirim via antrian
-class OverdueOvertimeReminderMail extends Mailable // implements ShouldQueue
+/**
+ * Class OverdueOvertimeReminderMail
+ *
+ * Mailable ini dikirim kepada approver (Asisten Manager atau Manager)
+ * untuk mengingatkan bahwa terdapat sejumlah pengajuan lembur yang telah melewati
+ * batas waktu tertentu (overdue) dan masih menunggu persetujuan mereka.
+ *
+ * @package App\Mail
+ */
+// class OverdueOvertimeReminderMail extends Mailable implements ShouldQueue // Opsional: implementasi antrian.
+class OverdueOvertimeReminderMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    // Properti publik untuk data email
+    /**
+     * Instance model User dari approver yang akan menerima email ini.
+     *
+     * @var \App\Models\User
+     */
     public User $approver;
-    public Collection $overdueRequests; // Collection berisi objek Overtime
 
     /**
-     * Create a new message instance.
+     * Koleksi dari objek Overtime yang overdue dan menunggu persetujuan approver ini.
      *
-     * @param Collection $overdueRequests Koleksi objek Overtime yang overdue.
-     * @param User $approver Objek user approver penerima email.
+     * @var \Illuminate\Support\Collection
+     */
+    public Collection $overdueRequests;
+
+    /**
+     * Membuat instance message baru.
+     *
+     * @param \Illuminate\Support\Collection $overdueRequests Koleksi objek Overtime yang overdue.
+     * @param \App\Models\User $approver Objek User approver penerima email.
+     * @return void
      */
     public function __construct(Collection $overdueRequests, User $approver)
     {
@@ -33,13 +53,15 @@ class OverdueOvertimeReminderMail extends Mailable // implements ShouldQueue
     }
 
     /**
-     * Get the message envelope.
+     * Mendapatkan envelope (amplop) pesan email.
      * Mendefinisikan subjek email.
+     *
+     * @return \Illuminate\Mail\Mailables\Envelope
      */
     public function envelope(): Envelope
     {
         $requestCount = $this->overdueRequests->count();
-        // Sesuaikan subjek untuk lembur
+        // Subjek disesuaikan untuk pengajuan lembur.
         $subject = "Pengingat: {$requestCount} Pengajuan Lembur Menunggu Persetujuan Anda";
 
         return new Envelope(
@@ -48,41 +70,48 @@ class OverdueOvertimeReminderMail extends Mailable // implements ShouldQueue
     }
 
     /**
-     * Get the message content definition.
-     * Menentukan view dan data untuk email.
+     * Mendapatkan definisi konten pesan email.
+     * Menentukan view Blade yang akan digunakan untuk merender konten email HTML
+     * dan data yang akan dikirimkan ke view tersebut.
+     *
+     * @return \Illuminate\Mail\Mailables\Content
      */
     public function content(): Content
     {
         return new Content(
-            view: 'emails.overtimes.overdue_reminder_html', // Path ke view email lembur
+            view: 'emails.overtimes.overdue_reminder_html', // Path ke view Blade untuk email lembur.
             with: [
                 'approverName' => $this->approver->name,
-                'requests' => $this->overdueRequests,
-                'approvalUrl' => $this->getApprovalUrl(), // URL halaman approval
+                'requests' => $this->overdueRequests, // Koleksi pengajuan lembur overdue.
+                'approvalUrl' => $this->getApprovalUrl(), // URL ke halaman approval lembur yang relevan.
             ],
         );
     }
 
     /**
-     * Helper untuk menentukan URL halaman approval lembur.
+     * Helper method untuk menentukan URL halaman approval lembur yang sesuai
+     * berdasarkan jabatan approver.
+     *
+     * @return string URL ke halaman approval lembur.
      */
     protected function getApprovalUrl(): string
     {
-        // Gunakan nama route yang sama seperti di Cuti
+        // Pastikan nama route ini sesuai dengan yang didefinisikan di file routes/web.php untuk lembur.
         if ($this->approver->jabatan === 'manager') {
-            // Pastikan nama route ini benar
-            return route('overtimes.approval.manager.list');
-        } else {
-            // Pastikan nama route ini benar
-            return route('overtimes.approval.asisten.list');
+            return route('overtimes.approval.manager.list'); // URL untuk approval Manager.
+        } else { // Asumsi selain manager adalah Asisten Manager.
+            return route('overtimes.approval.asisten.list'); // URL untuk approval Asisten Manager.
         }
     }
 
     /**
-     * Get the attachments for the message.
+     * Mendapatkan lampiran (attachments) untuk pesan email.
+     * Mailable ini tidak memiliki lampiran.
+     *
+     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
      */
     public function attachments(): array
     {
-        return []; // Tidak ada attachment
+        return [];
     }
 }

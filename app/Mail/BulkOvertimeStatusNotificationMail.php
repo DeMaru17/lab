@@ -3,28 +3,55 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldQueue; // Direkomendasikan untuk diaktifkan.
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Collection; // Import Collection
+use Illuminate\Support\Collection; // Menggunakan Collection untuk daftar lembur.
 use App\Models\User;
 
-class BulkOvertimeStatusNotificationMail extends Mailable implements ShouldQueue // Gunakan Queue
+/**
+ * Class BulkOvertimeStatusNotificationMail
+ *
+ * Mailable ini dikirim kepada karyawan untuk memberitahukan bahwa sejumlah
+ * pengajuan lembur mereka telah disetujui secara massal (bulk approve) oleh Manager.
+ * Email ini berisi ringkasan dari beberapa pengajuan lembur yang disetujui.
+ *
+ * @package App\Mail
+ */
+class BulkOvertimeStatusNotificationMail extends Mailable implements ShouldQueue // Menggunakan antrian.
 {
     use Queueable, SerializesModels;
 
-    public User $pengaju; // User yang mengajukan (penerima email)
-    public User $approver; // User yang melakukan approval (manager)
-    public Collection $approvedOvertimes; // Koleksi lembur yang disetujui
+    /**
+     * Pengguna (karyawan) yang mengajukan lembur dan akan menerima email ini.
+     *
+     * @var \App\Models\User
+     */
+    public User $pengaju;
 
     /**
-     * Create a new message instance.
+     * Pengguna (Manager) yang melakukan proses persetujuan massal.
      *
-     * @param Collection $approvedOvertimes Koleksi objek Overtime yang disetujui.
-     * @param User $approver Objek user approver (manager).
-     * @param User $pengaju Objek user pengaju (penerima).
+     * @var \App\Models\User
+     */
+    public User $approver;
+
+    /**
+     * Koleksi dari objek Overtime yang telah disetujui secara massal.
+     *
+     * @var \Illuminate\Support\Collection
+     */
+    public Collection $approvedOvertimes;
+
+    /**
+     * Membuat instance message baru.
+     *
+     * @param \Illuminate\Support\Collection $approvedOvertimes Koleksi objek Overtime yang disetujui.
+     * @param \App\Models\User $approver Objek User approver (Manager).
+     * @param \App\Models\User $pengaju Objek User pengaju (karyawan penerima email).
+     * @return void
      */
     public function __construct(Collection $approvedOvertimes, User $approver, User $pengaju)
     {
@@ -34,7 +61,10 @@ class BulkOvertimeStatusNotificationMail extends Mailable implements ShouldQueue
     }
 
     /**
-     * Get the message envelope.
+     * Mendapatkan envelope (amplop) pesan email.
+     * Mendefinisikan subjek email.
+     *
+     * @return \Illuminate\Mail\Mailables\Envelope
      */
     public function envelope(): Envelope
     {
@@ -47,24 +77,32 @@ class BulkOvertimeStatusNotificationMail extends Mailable implements ShouldQueue
     }
 
     /**
-     * Get the message content definition.
+     * Mendapatkan definisi konten pesan email.
+     * Menentukan view Blade yang akan digunakan untuk merender konten email HTML
+     * dan data yang akan dikirimkan ke view tersebut.
+     *
+     * @return \Illuminate\Mail\Mailables\Content
      */
     public function content(): Content
     {
         return new Content(
-            // Kita akan buat view markdown ini
+            // Path ke view Blade untuk email ini.
+            // View ini akan menampilkan daftar ringkasan dari beberapa pengajuan lembur.
             view: 'emails.overtimes.bulk_status_notification_html',
             with: [
                 'namaKaryawan' => $this->pengaju->name,
                 'approverName' => $this->approver->name,
-                'requests' => $this->approvedOvertimes, // Kirim collection
-                'viewUrl' => route('overtimes.index'), // Link ke daftar lembur
+                'requests' => $this->approvedOvertimes, // Mengirim koleksi objek Overtime ke view.
+                'viewUrl' => route('overtimes.index'),  // URL untuk tombol "Lihat Daftar Lembur".
             ],
         );
     }
 
     /**
-     * Get the attachments for the message.
+     * Mendapatkan lampiran (attachments) untuk pesan email.
+     * Mailable ini tidak memiliki lampiran.
+     *
+     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
      */
     public function attachments(): array
     {
